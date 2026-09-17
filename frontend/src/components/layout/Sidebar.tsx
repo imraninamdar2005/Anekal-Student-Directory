@@ -60,23 +60,35 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
         }`}
       >
         {/* Brand header */}
-        <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-          <Link href="/dashboard" className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-sky-600 flex items-center justify-center text-white font-bold text-base shadow-md shadow-sky-600/30">
+        <div className="p-5 border-b border-slate-800/90 flex items-start justify-between">
+          <Link href="/dashboard" className="flex items-start gap-3 group flex-1">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-sky-600/30 flex-shrink-0 mt-0.5 group-hover:scale-105 transition-all">
               A
             </div>
-            <div>
-              <span className="font-bold text-white tracking-wide text-sm block">
-                ANEKAL DIRECTORY
+            <div className="flex-1 min-w-0">
+              <span className="font-extrabold text-white tracking-tight text-[15px] block leading-snug">
+                Anekal Student<br />Directory
               </span>
-              <span className="block text-[10.5px] text-sky-400 font-medium">
-                Student Directory System
-              </span>
+              
+              <div className="mt-2.5 pt-2 border-t border-slate-800/60">
+                <span className="text-[10.5px] text-slate-400 font-semibold tracking-wider uppercase block">
+                  Built by
+                </span>
+                <div className="inline-flex items-center gap-1.5 mt-0.5 relative group/name">
+                  <span className="text-[13px] font-extrabold tracking-tight bg-gradient-to-r from-amber-400 via-white to-emerald-400 bg-clip-text text-transparent drop-shadow-sm">
+                    Imran Inamdar
+                  </span>
+                  <span className="text-[10px] text-amber-300 font-semibold">✦</span>
+                </div>
+                {/* Subtle India Tricolor Accent Line */}
+                <div className="h-[2px] w-28 rounded-full bg-gradient-to-r from-amber-500 via-slate-200 to-emerald-500 mt-1 opacity-80" />
+              </div>
             </div>
           </Link>
           <button
             onClick={onClose}
-            className="lg:hidden p-1 text-slate-400 hover:text-white"
+            className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors mt-0.5"
+            aria-label="Close Sidebar"
           >
             ✕
           </button>
