@@ -19,10 +19,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950">
         <div className="flex flex-col items-center gap-3">
           <div className="w-10 h-10 border-4 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-sm font-medium text-slate-600">Loading student directory...</p>
+          <p className="text-sm font-medium text-slate-600 dark:text-slate-400">Loading student directory...</p>
         </div>
       </div>
     );
@@ -33,7 +33,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 flex transition-colors duration-200">
       <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
       
       <div className="flex-1 lg:pl-64 flex flex-col min-h-screen">
@@ -43,7 +43,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           {children}
         </main>
 
-        <footer className="py-4 px-6 border-t border-slate-200 text-center text-xs text-slate-500 bg-white">
+        <footer className="py-4 px-6 border-t border-slate-200 dark:border-slate-800 text-center text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900 transition-colors duration-200">
           Anekal Student Directory &copy; 2026 &bull; Student Management &amp; Community Directory System
         </footer>
       </div>

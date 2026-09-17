@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import api from './api';
 
 interface User {
+  id?: number;
   username: string;
   full_name: string;
   role: 'Admin' | 'Data Manager' | 'Viewer' | string;
