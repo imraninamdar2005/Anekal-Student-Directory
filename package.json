@@ -1,0 +1,24 @@
+{
+  "name": "anekal-student-directory",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Anekal Student Directory - Community Directory Management Platform",
+  "scripts": {
+    "dev": "node dev.js",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "dev:backend": "python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload",
+    "seed": "python -m app.seed",
+    "install:all": "npm install --prefix frontend && pip install -r backend/requirements.txt",
+    "build": "npm run build --prefix frontend",
+    "start": "npm run start --prefix frontend",
+    "test:backend": "pytest backend/tests/"
+  },
+  "keywords": [
+    "anekal",
+    "student-directory",
+    "fastapi",
+    "nextjs"
+  ],
+  "author": "",
+  "license": "ISC"
+}
