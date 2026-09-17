@@ -57,10 +57,9 @@ def test_viewer_contact_redaction():
     response = client.get("/api/students", headers=headers)
     assert response.status_code == 200
     items = response.json()["items"]
-    # Check that contact numbers are masked for viewer
     for item in items:
-        if item.get("primary_contact"):
-            assert "••••" in item["primary_contact"]
+        if item.get("contact_number"):
+            assert "••••" in item["contact_number"]
 
 def test_create_and_fetch_student():
     login_res = client.post("/api/auth/login", json={
@@ -70,13 +69,20 @@ def test_create_and_fetch_student():
     token = login_res.json()["access_token"]
     headers = {"Authorization": f"Bearer {token}"}
 
+    schools_res = client.get("/api/schools", headers=headers)
+    assert schools_res.status_code == 200
+    first_sch_id = schools_res.json()[0]["id"]
+
     payload = {
         "full_name": "Kavitha Narayanan",
-        "primary_contact": "9845099887",
-        "additional_contact": "9448099887",
-        "additional_contact_relation": "Parent",
+        "parent_guardian_relation": "Mother",
+        "parent_guardian_name": "Lakshmi N",
+        "contact_number": "9845099887",
+        "second_number": "9448099887",
+        "second_number_relation": "Parent",
         "education_type": "School",
-        "class_standard": "10th",
+        "school_id": first_sch_id,
+        "class_or_standard": "10th",
         "academic_year": "2025-26",
         "passout_year": 2026,
         "current_status": "Currently Studying",
@@ -85,7 +91,24 @@ def test_create_and_fetch_student():
     assert response.status_code == 201
     created = response.json()
     assert created["full_name"] == "Kavitha Narayanan"
-    assert created["student_id"].startswith("AKL-")
+    assert created["student_id"].startswith("ANL-")
+
+def test_dashboard_overview():
+    login_res = client.post("/api/auth/login", json={
+        "username": "admin",
+        "password": "Password@123"
+    })
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    response = client.get("/api/dashboard/overview", headers=headers)
+    assert response.status_code == 200
+    data = response.json()
+    assert "total_students" in data
+    assert "total_schools" in data
+    assert "total_colleges" in data
+    assert "school_students" in data
+    assert "college_students" in data
 
 def test_schools_and_colleges_drilldown():
     login_res = client.post("/api/auth/login", json={
@@ -116,6 +139,18 @@ def test_schools_and_colleges_drilldown():
     assert college_details.status_code == 200
     assert "academic_years_breakdown" in college_details.json()
     assert "passout_years_breakdown" in college_details.json()
+
+def test_profession_master_data():
+    login_res = client.post("/api/auth/login", json={
+        "username": "admin",
+        "password": "Password@123"
+    })
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    prof_res = client.post("/api/master-data/professions", json={"profession_name": "Civil Engineer"}, headers=headers)
+    assert prof_res.status_code == 201 or prof_res.status_code == 200
+    assert prof_res.json()["profession_name"] == "Civil Engineer"
 
 def test_export_endpoint():
     login_res = client.post("/api/auth/login", json={

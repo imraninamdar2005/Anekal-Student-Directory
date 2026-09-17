@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/lib/auth-context';
-import { LogOut } from 'lucide-react';
+import { LogOut, Sun, Moon } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import Link from 'next/link';
 
@@ -12,6 +12,34 @@ interface NavbarProps {
 
 export default function Navbar({ onMenuClick }: NavbarProps) {
   const { user, logout } = useAuth();
+  const [isDark, setIsDark] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedTheme = localStorage.getItem('anekal_theme');
+      if (savedTheme === 'dark') {
+        setIsDark(true);
+        document.documentElement.classList.add('dark');
+      } else {
+        setIsDark(false);
+        document.documentElement.classList.remove('dark');
+      }
+    }
+  }, []);
+
+  const toggleTheme = () => {
+    if (typeof window !== 'undefined') {
+      if (isDark) {
+        document.documentElement.classList.remove('dark');
+        localStorage.setItem('anekal_theme', 'light');
+        setIsDark(false);
+      } else {
+        document.documentElement.classList.add('dark');
+        localStorage.setItem('anekal_theme', 'dark');
+        setIsDark(true);
+      }
+    }
+  };
 
   const getRoleVariant = (role?: string) => {
     switch (role) {
@@ -49,7 +77,21 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 sm:gap-3">
+        {/* Compact Theme Toggle Icon Button */}
+        <button
+          onClick={toggleTheme}
+          title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+          className="p-2 text-slate-500 hover:text-amber-500 hover:bg-amber-50/70 rounded-xl border border-slate-200/80 transition-all flex items-center justify-center"
+          aria-label="Toggle Theme"
+        >
+          {isDark ? (
+            <Sun className="w-4 h-4 text-amber-500" />
+          ) : (
+            <Moon className="w-4 h-4 text-slate-600" />
+          )}
+        </button>
+
         {user ? (
           <div className="flex items-center gap-2 sm:gap-3 pl-2 sm:pl-3 border-l border-slate-200">
             <div className="text-right hidden sm:block">
@@ -66,7 +108,7 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
             <button
               onClick={logout}
               title="Logout"
-              className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+              className="p-2 text-slate-500 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors"
             >
               <LogOut className="w-4 h-4" />
             </button>

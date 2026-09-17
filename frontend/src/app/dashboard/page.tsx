@@ -113,27 +113,59 @@ export default function DashboardPage() {
 
         {/* 3 Clean KPI Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          {kpis.map((kpi, idx) => {
-            const Icon = kpi.icon;
-            return (
-              <div
-                key={idx}
-                className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-medium text-slate-500">{kpi.label}</span>
-                  <div className={`p-2 rounded-xl border ${kpi.bg}`}>
-                    <Icon className={`w-4 h-4 ${kpi.color}`} />
-                  </div>
-                </div>
-                <div className="mt-3">
-                  <div className="text-2xl sm:text-3xl font-bold text-slate-800">
-                    {kpi.value}
-                  </div>
-                </div>
+          {/* Total Students Card */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-500">Total Students</span>
+              <div className="p-2 rounded-xl border bg-sky-50 border-sky-200">
+                <Users className="w-4 h-4 text-sky-600" />
               </div>
-            );
-          })}
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl sm:text-3xl font-bold text-slate-800">
+                {overview?.total_students || 0}
+              </div>
+              <div className="text-[11.5px] text-slate-500 mt-0.5">
+                Across all registered institutions
+              </div>
+            </div>
+          </div>
+
+          {/* Total Schools Card */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-500">Total Schools</span>
+              <div className="p-2 rounded-xl border bg-amber-50 border-amber-200">
+                <GraduationCap className="w-4 h-4 text-amber-600" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl sm:text-3xl font-bold text-slate-800">
+                {overview?.total_schools || 0}
+              </div>
+              <div className="text-[11.5px] text-amber-700 font-medium mt-0.5">
+                Students: <span className="font-bold">{overview?.school_students || 0}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Total Colleges / Universities Card */}
+          <div className="bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm flex flex-col justify-between">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-medium text-slate-500">Total Colleges / Universities</span>
+              <div className="p-2 rounded-xl border bg-indigo-50 border-indigo-200">
+                <Building2 className="w-4 h-4 text-indigo-600" />
+              </div>
+            </div>
+            <div className="mt-3">
+              <div className="text-2xl sm:text-3xl font-bold text-slate-800">
+                {overview?.total_colleges || 0}
+              </div>
+              <div className="text-[11.5px] text-indigo-700 font-medium mt-0.5">
+                Students: <span className="font-bold">{overview?.college_students || 0}</span>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* 3 Clean Charts */}

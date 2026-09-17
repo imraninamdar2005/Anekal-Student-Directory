@@ -4,10 +4,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 
 from app.database import get_db
-from app.models import AcademicYear, Area, User
+from app.models import AcademicYear, Area, Profession, User
 from app.schemas import (
     AcademicYearOut, AcademicYearBase,
-    AreaOut, AreaBase
+    AreaOut, AreaBase,
+    ProfessionOut, ProfessionBase
 )
 from app.auth import get_current_user, require_role
 from app.audit import log_audit
@@ -103,3 +104,43 @@ def delete_area(
     db.commit()
     log_audit(db, current_user, "DELETE_AREA", "Area", entity_id=str(id), details={"area_name": name}, request=request)
     return {"message": f"Area '{name}' deleted successfully"}
+
+# --- Professions ---
+@router.get("/professions", response_model=List[ProfessionOut])
+def list_professions(db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    professions = db.query(Profession).order_by(Profession.profession_name.asc()).all()
+    if not professions:
+        defaults = [
+            "Software Engineer",
+            "Teacher",
+            "Doctor",
+            "Business",
+            "Government Employee",
+            "Student",
+            "Other"
+        ]
+        for p in defaults:
+            db.add(Profession(profession_name=p, is_active=True))
+        db.commit()
+        professions = db.query(Profession).order_by(Profession.profession_name.asc()).all()
+    return professions
+
+@router.post("/professions", response_model=ProfessionOut, status_code=status.HTTP_201_CREATED)
+def create_profession(
+    payload: ProfessionBase,
+    request: Request,
+    current_user: User = Depends(require_role(["Admin", "Data Manager"])),
+    db: Session = Depends(get_db)
+):
+    name = payload.profession_name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="Profession name cannot be empty")
+    existing = db.query(Profession).filter(func.lower(Profession.profession_name) == func.lower(name)).first()
+    if existing:
+        return existing
+    prof = Profession(profession_name=name, is_active=payload.is_active)
+    db.add(prof)
+    db.commit()
+    db.refresh(prof)
+    log_audit(db, current_user, "CREATE_PROFESSION", "Profession", entity_id=str(prof.id), details={"profession_name": prof.profession_name}, request=request)
+    return prof

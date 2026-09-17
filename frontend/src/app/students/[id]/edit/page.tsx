@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import AppShell from '@/components/layout/AppShell';
 import api from '@/lib/api';
+import { formatApiError } from '@/lib/error-utils';
 import {
   ArrowLeft,
   AlertCircle
@@ -44,6 +45,7 @@ export default function EditStudentPage() {
   const [colleges, setColleges] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [areas, setAreas] = useState<any[]>([]);
+  const [professions, setProfessions] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -52,17 +54,19 @@ export default function EditStudentPage() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [resSch, resCol, resAy, resAr, resStudent] = await Promise.all([
+        const [resSch, resCol, resAy, resAr, resProf, resStudent] = await Promise.all([
           api.get('/api/schools'),
           api.get('/api/colleges'),
           api.get('/api/master-data/academic-years'),
           api.get('/api/master-data/areas'),
+          api.get('/api/master-data/professions'),
           api.get(`/api/students/${id}`),
         ]);
         setSchools(resSch.data);
         setColleges(resCol.data);
         setAcademicYears(resAy.data);
         setAreas(resAr.data);
+        setProfessions(resProf.data);
 
         const st = resStudent.data;
         setFormData({
@@ -88,7 +92,7 @@ export default function EditStudentPage() {
           profession: st.profession || '',
         });
       } catch (err: any) {
-        setError(err.response?.data?.detail || 'Failed to load record for editing');
+        setError(formatApiError(err, 'Failed to load record for editing'));
       } finally {
         setLoading(false);
       }
@@ -145,7 +149,7 @@ export default function EditStudentPage() {
       await api.put(`/api/students/${id}`, payload);
       router.push(`/students/${id}`);
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to update student.');
+      setError(formatApiError(err, 'Failed to update student.'));
     } finally {
       setSaving(false);
     }
@@ -207,29 +211,27 @@ export default function EditStudentPage() {
               />
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Parent Relation</label>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">Parent / Guardian Details</label>
+              <div className="flex gap-2">
                 <select
                   name="parent_guardian_relation"
                   value={formData.parent_guardian_relation}
                   onChange={handleChange}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-36 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl font-medium text-slate-800"
                 >
                   <option value="Father">Father</option>
                   <option value="Mother">Mother</option>
                   <option value="Guardian">Guardian</option>
                   <option value="Other">Other</option>
                 </select>
-              </div>
-              <div className="sm:col-span-2">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">Parent / Guardian Name</label>
                 <input
                   type="text"
                   name="parent_guardian_name"
+                  placeholder="Enter parent / guardian name"
                   value={formData.parent_guardian_name}
                   onChange={handleChange}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="flex-1 text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
                 />
               </div>
             </div>
@@ -257,7 +259,7 @@ export default function EditStudentPage() {
                   >
                     <option value="Parent">Parent</option>
                     <option value="Guardian">Guardian</option>
-                    <option value="Alternate Contact">Alternate</option>
+                    <option value="Self / Personal">Self / Personal</option>
                   </select>
                   <input
                     type="tel"
@@ -471,8 +473,8 @@ export default function EditStudentPage() {
                     className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
                   >
                     <option value="">-- Select Profession --</option>
-                    {['Software Engineer', 'Teacher', 'Business', 'Government Job', 'Student', 'Job Seeking', 'Other'].map((p) => (
-                      <option key={p} value={p}>{p}</option>
+                    {professions.map((p) => (
+                      <option key={p.id} value={p.profession_name}>{p.profession_name}</option>
                     ))}
                   </select>
                 </div>

@@ -4,8 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import AppShell from '@/components/layout/AppShell';
 import api from '@/lib/api';
+import { formatApiError } from '@/lib/error-utils';
 import {
-  UserPlus,
   ArrowRight,
   ArrowLeft,
   CheckCircle2,
@@ -13,9 +13,7 @@ import {
   GraduationCap,
   Building2,
   MapPin,
-  School as SchoolIcon,
-  Phone,
-  HelpCircle,
+  Briefcase,
   Plus
 } from 'lucide-react';
 import { Badge } from '@/components/ui/Badge';
@@ -65,6 +63,7 @@ export default function AddStudentWizardPage() {
   const [colleges, setColleges] = useState<any[]>([]);
   const [academicYears, setAcademicYears] = useState<any[]>([]);
   const [areas, setAreas] = useState<any[]>([]);
+  const [professions, setProfessions] = useState<any[]>([]);
 
   // Duplicate Check
   const [duplicateWarning, setDuplicateWarning] = useState<any | null>(null);
@@ -84,18 +83,23 @@ export default function AddStudentWizardPage() {
   const [newAreaName, setNewAreaName] = useState('');
   const [newAreaDesc, setNewAreaDesc] = useState('');
 
+  const [showAddProfessionModal, setShowAddProfessionModal] = useState(false);
+  const [newProfessionName, setNewProfessionName] = useState('');
+
   const fetchMasterData = async () => {
     try {
-      const [resSchools, resColleges, resAys, resAreas] = await Promise.all([
+      const [resSchools, resColleges, resAys, resAreas, resProf] = await Promise.all([
         api.get('/api/schools'),
         api.get('/api/colleges'),
         api.get('/api/master-data/academic-years'),
         api.get('/api/master-data/areas'),
+        api.get('/api/master-data/professions'),
       ]);
       setSchools(resSchools.data);
       setColleges(resColleges.data);
       setAcademicYears(resAys.data);
       setAreas(resAreas.data);
+      setProfessions(resProf.data);
 
       if (resSchools.data.length > 0 && !formData.school_id) {
         setFormData((prev) => ({ ...prev, school_id: String(resSchools.data[0].id) }));
@@ -117,7 +121,6 @@ export default function AddStudentWizardPage() {
 
   // Automatic calculation of expected passout year
   useEffect(() => {
-    // Parse starting academic year, e.g. "2026-27" -> 2026
     let startYear = 2026;
     if (formData.academic_year && formData.academic_year.includes('-')) {
       const parsed = parseInt(formData.academic_year.split('-')[0], 10);
@@ -200,7 +203,7 @@ export default function AddStudentWizardPage() {
         parent_guardian_name: formData.parent_guardian_name.trim() || null,
         contact_number: formData.contact_number.trim(),
         second_number: formData.second_number.trim() || null,
-        second_number_relation: formData.second_number ? formData.second_number_relation : 'Parent',
+        second_number_relation: formData.second_number.trim() ? formData.second_number_relation : 'Parent',
         education_type: formData.education_type,
         academic_year: formData.academic_year,
         passout_year: formData.passout_year ? Number(formData.passout_year) : null,
@@ -208,7 +211,7 @@ export default function AddStudentWizardPage() {
         address: formData.address.trim() || null,
         near_masjid: formData.near_masjid.trim() || null,
         current_status: formData.current_status,
-        profession: formData.current_status === 'Passed Out' ? formData.profession.trim() || null : null,
+        profession: formData.current_status === 'Passed Out' ? (formData.profession.trim() || null) : null,
       };
 
       if (formData.education_type === 'School') {
@@ -224,7 +227,7 @@ export default function AddStudentWizardPage() {
       await api.post('/api/students', payload);
       router.push('/students');
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to save student record. Please verify fields.');
+      setError(formatApiError(err, 'Failed to save student record. Please verify fields.'));
     } finally {
       setSubmitting(false);
     }
@@ -245,7 +248,7 @@ export default function AddStudentWizardPage() {
       setNewSchoolLocality('');
       setShowAddSchoolModal(false);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to create school');
+      alert(formatApiError(err, 'Failed to create school'));
     }
   };
 
@@ -264,7 +267,7 @@ export default function AddStudentWizardPage() {
       setNewCollegeLocality('');
       setShowAddCollegeModal(false);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to create college');
+      alert(formatApiError(err, 'Failed to create college'));
     }
   };
 
@@ -283,7 +286,28 @@ export default function AddStudentWizardPage() {
       setNewAreaDesc('');
       setShowAddAreaModal(false);
     } catch (err: any) {
-      alert(err.response?.data?.detail || 'Failed to create area');
+      alert(formatApiError(err, 'Failed to create area'));
+    }
+  };
+
+  // Quick Add Profession
+  const handleCreateProfession = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newProfessionName.trim()) return;
+    try {
+      const res = await api.post('/api/master-data/professions', {
+        profession_name: newProfessionName.trim(),
+        is_active: true,
+      });
+      const exists = professions.find((p) => p.profession_name.toLowerCase() === res.data.profession_name.toLowerCase());
+      if (!exists) {
+        setProfessions((prev) => [...prev, res.data]);
+      }
+      setFormData((prev) => ({ ...prev, profession: res.data.profession_name }));
+      setNewProfessionName('');
+      setShowAddProfessionModal(false);
+    } catch (err: any) {
+      alert(formatApiError(err, 'Failed to add profession'));
     }
   };
 
@@ -358,39 +382,33 @@ export default function AddStudentWizardPage() {
                 />
               </div>
 
-              {/* Parent / Guardian (Requirement H) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Parent / Guardian Relation
-                  </label>
+              {/* Parent / Guardian (Single Compact Row: [Relation Dropdown] [Name Input]) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                  Parent / Guardian Details
+                </label>
+                <div className="flex gap-2">
                   <select
                     value={formData.parent_guardian_relation}
                     onChange={(e) => setFormData({ ...formData, parent_guardian_relation: e.target.value })}
-                    className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-36 text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium text-slate-800"
                   >
                     <option value="Father">Father</option>
                     <option value="Mother">Mother</option>
                     <option value="Guardian">Guardian</option>
                     <option value="Other">Other</option>
                   </select>
-                </div>
-
-                <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Parent / Guardian Name
-                  </label>
                   <input
                     type="text"
-                    placeholder="e.g. Farooq Khan"
+                    placeholder="Enter parent / guardian name"
                     value={formData.parent_guardian_name}
                     onChange={(e) => setFormData({ ...formData, parent_guardian_name: e.target.value })}
-                    className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="flex-1 text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
                   />
                 </div>
               </div>
 
-              {/* Contact Number (Requirement G) */}
+              {/* Contact Number */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Contact Number *
@@ -405,7 +423,7 @@ export default function AddStudentWizardPage() {
                 />
               </div>
 
-              {/* Second Number (Optional) (Requirement G) */}
+              {/* Second Number (Optional) with simple "Whose number is this?" options */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -418,7 +436,7 @@ export default function AddStudentWizardPage() {
                   >
                     <option value="Parent">Parent</option>
                     <option value="Guardian">Guardian</option>
-                    <option value="Alternate Contact">Alternate Contact</option>
+                    <option value="Self / Personal">Self / Personal</option>
                   </select>
                 </div>
 
@@ -725,7 +743,7 @@ export default function AddStudentWizardPage() {
                 />
               </div>
 
-              {/* Near which Masjid? (Optional, Requirement N) */}
+              {/* Near which Masjid? (Optional) */}
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Near which Masjid? (Optional)
@@ -739,7 +757,7 @@ export default function AddStudentWizardPage() {
                 />
               </div>
 
-              {/* Status (Requirement L) */}
+              {/* Status */}
               <div className="pt-2 border-t border-slate-100">
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Status
@@ -755,10 +773,23 @@ export default function AddStudentWizardPage() {
                 </select>
               </div>
 
-              {/* Current Profession (Shown ONLY if Passed Out, Requirement L) */}
+              {/* Current Profession (Shown ONLY if Passed Out) */}
               {formData.current_status === 'Passed Out' && (
                 <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
-                  <h3 className="text-xs font-bold text-emerald-900">Alumni Details</h3>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Passed Out / Alumni Details</span>
+                    </h3>
+                    <button
+                      type="button"
+                      onClick={() => setShowAddProfessionModal(true)}
+                      className="text-xs text-emerald-700 hover:text-emerald-800 font-semibold flex items-center gap-1"
+                    >
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>+ Add New Profession</span>
+                    </button>
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-emerald-800 mb-1">
                       Current Profession / Occupation
@@ -766,16 +797,14 @@ export default function AddStudentWizardPage() {
                     <select
                       value={formData.profession}
                       onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
-                      className="w-full text-xs p-3 bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                      className="w-full text-xs p-3 bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
                     >
-                      <option value="">Select Profession</option>
-                      <option value="Software Engineer">Software Engineer</option>
-                      <option value="Teacher">Teacher</option>
-                      <option value="Business">Business</option>
-                      <option value="Government Job">Government Job</option>
-                      <option value="Student">Student</option>
-                      <option value="Job Seeking">Job Seeking</option>
-                      <option value="Other">Other</option>
+                      <option value="">-- Select Profession --</option>
+                      {professions.map((p) => (
+                        <option key={p.id} value={p.profession_name}>
+                          {p.profession_name}
+                        </option>
+                      ))}
                     </select>
                   </div>
                 </div>
@@ -1039,7 +1068,7 @@ export default function AddStudentWizardPage() {
                 />
                 <input
                   type="text"
-                  placeholder="Description (Optional)"
+                  placeholder="Optional: nearby landmark, famous place, or other location detail."
                   value={newAreaDesc}
                   onChange={(e) => setNewAreaDesc(e.target.value)}
                   className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
@@ -1057,6 +1086,43 @@ export default function AddStudentWizardPage() {
                     className="px-4 py-2 text-xs font-semibold text-white bg-sky-600 rounded-xl"
                   >
                     Save Area
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Quick Add Profession Modal */}
+        {showAddProfessionModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
+              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+                <Briefcase className="w-4 h-4 text-emerald-600" />
+                Add New Profession
+              </h3>
+              <form onSubmit={handleCreateProfession} className="space-y-3">
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Graphic Designer, Electrician, Pharmacist"
+                  value={newProfessionName}
+                  onChange={(e) => setNewProfessionName(e.target.value)}
+                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                />
+                <div className="flex justify-end gap-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddProfessionModal(false)}
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl"
+                  >
+                    Save Profession
                   </button>
                 </div>
               </form>

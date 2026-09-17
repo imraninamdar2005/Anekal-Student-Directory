@@ -108,6 +108,16 @@ class AreaOut(AreaBase):
 
     model_config = ConfigDict(from_attributes=True)
 
+class ProfessionBase(BaseModel):
+    profession_name: str
+    is_active: bool = True
+
+class ProfessionOut(ProfessionBase):
+    id: int
+    created_at: datetime.datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
 # --- Student Schemas ---
 class StudentBase(BaseModel):
     student_id: Optional[str] = None
@@ -225,6 +235,8 @@ class DashboardOverview(BaseModel):
     total_students: int
     total_schools: int
     total_colleges: int
+    school_students: int
+    college_students: int
     recently_added: List[StudentOut]
     recently_modified: List[StudentOut]
 

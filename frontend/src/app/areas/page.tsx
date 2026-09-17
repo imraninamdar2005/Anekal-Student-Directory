@@ -98,7 +98,7 @@ export default function AreasPage() {
                 type="text"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Description (Optional)"
+                placeholder="Optional: nearby landmark, famous place, or other location detail."
                 className="text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
               />
               <button

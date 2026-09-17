@@ -15,7 +15,8 @@ def get_dashboard_overview(db: Session = Depends(get_db), current_user: User = D
     total_students = db.query(func.count(Student.id)).scalar() or 0
     total_schools = db.query(func.count(School.id)).scalar() or 0
     total_colleges = db.query(func.count(College.id)).scalar() or 0
-    graduated_students = db.query(func.count(Student.id)).filter(Student.current_status == "Graduated / Passed Out").scalar() or 0
+    school_students = db.query(func.count(Student.id)).filter(Student.education_type == "School").scalar() or 0
+    college_students = db.query(func.count(Student.id)).filter(Student.education_type == "College / University").scalar() or 0
 
     recently_added = (
         db.query(Student)
@@ -35,7 +36,8 @@ def get_dashboard_overview(db: Session = Depends(get_db), current_user: User = D
         "total_students": total_students,
         "total_schools": total_schools,
         "total_colleges": total_colleges,
-        "graduated_students": graduated_students,
+        "school_students": school_students,
+        "college_students": college_students,
         "recently_added": [sanitize_student_for_role(s, current_user.role) for s in recently_added],
         "recently_modified": [sanitize_student_for_role(s, current_user.role) for s in recently_modified],
     }

@@ -62,6 +62,14 @@ class Area(Base):
 
     students = relationship("Student", back_populates="area")
 
+class Profession(Base):
+    __tablename__ = "professions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    profession_name = Column(String(255), unique=True, index=True, nullable=False)
+    is_active = Column(Boolean, default=True)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+
 class Student(Base):
     __tablename__ = "students"
 

@@ -244,7 +244,7 @@ export default function StudentsListPage() {
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search students..."
+              placeholder="Search by student name, ID, contact number, parent name, school, college or area..."
               className="w-full pl-10 pr-10 py-2.5 text-xs bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 focus:bg-white text-slate-800 placeholder-slate-400"
             />
             {searchQuery && (

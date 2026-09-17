@@ -34,6 +34,8 @@ def test_api():
     assert "total_students" in overview
     assert "total_schools" in overview
     assert "total_colleges" in overview
+    assert "school_students" in overview
+    assert "college_students" in overview
 
     # 4. Charts metrics
     charts = requests.get(f"{BASE_URL}/api/dashboard/charts", headers=headers).json()
@@ -62,7 +64,12 @@ def test_api():
     assert "students" in col_detail
     print(f"College detail for '{col_detail['college']['college_name']}': {col_detail['total_students']} students, {len(col_detail['academic_years_breakdown'])} academic year buckets, {len(col_detail['passout_years_breakdown'])} passout year buckets")
 
-    # 7. Student Creation test with 5-step form data
+    # 7. Profession master data test
+    prof_res = requests.post(f"{BASE_URL}/api/master-data/professions", json={"profession_name": "Data Scientist"}, headers=headers)
+    assert prof_res.status_code == 201 or prof_res.status_code == 200
+    print("Profession creation success:", prof_res.json())
+
+    # 8. Student Creation test with 5-step form data (Currently Studying)
     new_student = {
         "full_name": "Deepak R",
         "parent_guardian_relation": "Father",
@@ -70,9 +77,9 @@ def test_api():
         "contact_number": "9876543210",
         "second_number": "9123456789",
         "second_number_relation": "Parent",
-        "study_type": "School",
+        "education_type": "School",
         "school_id": first_sch_id,
-        "class_standard": "10th",
+        "class_or_standard": "10th",
         "academic_year": "2025-26",
         "passout_year": 2026,
         "current_status": "Currently Studying"
@@ -80,9 +87,39 @@ def test_api():
     create_res = requests.post(f"{BASE_URL}/api/students", json=new_student, headers=headers)
     assert create_res.status_code == 201, create_res.text
     created = create_res.json()
-    print("Created student successfully:", created["student_id"], created["full_name"])
+    print("Created student (School) successfully:", created["student_id"], created["full_name"])
 
-    # 8. Export test
+    # 9. Student Creation test with Passed Out + Profession
+    passed_student = {
+        "full_name": "Suhail Ahmed",
+        "parent_guardian_relation": "Father",
+        "parent_guardian_name": "Ahmed Hussain",
+        "contact_number": "9876543211",
+        "second_number_relation": "Self / Personal",
+        "education_type": "College / University",
+        "college_id": first_col_id,
+        "course_degree": "BE",
+        "branch_specialization": "Computer Science",
+        "academic_year": "2022-23",
+        "passout_year": 2026,
+        "current_status": "Passed Out",
+        "profession": "Software Engineer"
+    }
+    create_passed_res = requests.post(f"{BASE_URL}/api/students", json=passed_student, headers=headers)
+    assert create_passed_res.status_code == 201, create_passed_res.text
+    created_passed = create_passed_res.json()
+    print("Created student (Passed Out) successfully:", created_passed["student_id"], created_passed["full_name"], created_passed["profession"])
+
+    # 10. Search test
+    search_res = requests.get(f"{BASE_URL}/api/students?q=Suhail", headers=headers).json()
+    assert search_res["total"] >= 1
+    print(f"Search by name 'Suhail' matched {search_res['total']} student(s)")
+
+    search_contact = requests.get(f"{BASE_URL}/api/students?q=9876543211", headers=headers).json()
+    assert search_contact["total"] >= 1
+    print(f"Search by contact '9876543211' matched {search_contact['total']} student(s)")
+
+    # 11. Export test
     exp_res = requests.get(f"{BASE_URL}/api/data-transfer/export?format=xlsx", headers=headers)
     assert exp_res.status_code == 200
     print(f"Export Excel size: {len(exp_res.content)} bytes")
