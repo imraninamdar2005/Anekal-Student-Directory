@@ -82,10 +82,9 @@ export default function ImportDataPage() {
 
   const downloadSampleCSV = () => {
     const csvContent =
-      "Full Name,Primary Contact,Additional Contact,Additional Contact Relation,Education Type,School,College,Class,Course,Branch,Current Year Sem,Academic Year,Passout Year,Locality,Status,Profession,Notes\n" +
-      "Arun Kumar,9845012345,9448012345,Parent,School,Anekal Central Public School,,10th,,,2025-26,2026,Anekal Town,Currently Studying,,10th standard student\n" +
-      "Deepa Rao,9845054321,,Parent,College,,Anekal Engineering Institute,,BE/B.Tech,Computer Science,3rd Year,2025-26,2027,Chandapura,Currently Studying,,Computer Science engineering\n" +
-      "Mohan Das,9876543210,9123456780,Alternative Contact,College,,Alliance Degree College Anekal,,B.Com,Finance,4th Year,2024-25,2024,Jigani,Graduated / Passed Out,Financial Analyst,Alumni member\n";
+      "Full Name,Primary Contact,Father Name,Father Contact,Mother Name,Mother Contact,Guardian Name,Guardian Contact,Education Type,School,College,Currently Studying,Academic Year,Passout Year,Education History,Locality,Masjid,Time Spent in Jamaat,Last Mulakhat Date,Status,Profession,Notes\n" +
+      "Ahmed Khan,9845012345,Ahmed Khan Sr,9876543210,Ayesha Khan,9876543211,Abdul Khan,9876543212,School,Anekal Model Public School,,10th,2025-26,2026,2026 (10th),Anekal Town,Masjid-e-Bilal,1–2 years,2026-09-25,Currently Studying,,Sample student\n" +
+      "Zainab Bi,9845054321,,,,,,,College,Anekal Model Public School,Alliance Degree College,B.Com - 2nd Year,2025-26,2027,2024 (10th) • 2027 (College),Chandapura,Not Provided,Not Provided,,Currently Studying,,College student\n";
 
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);

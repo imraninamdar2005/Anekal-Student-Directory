@@ -81,6 +81,14 @@ class Student(Base):
     parent_guardian_relation = Column(String(50), default="Father", nullable=True)  # Father, Mother, Guardian, Other
     parent_guardian_name = Column(String(255), nullable=True)
     
+    # Separate Father, Mother, Guardian Information & Contacts (Optional)
+    father_name = Column(String(255), nullable=True)
+    father_contact = Column(String(50), nullable=True)
+    mother_name = Column(String(255), nullable=True)
+    mother_contact = Column(String(50), nullable=True)
+    guardian_name = Column(String(255), nullable=True)
+    guardian_contact = Column(String(50), nullable=True)
+
     # Contact numbers
     contact_number = Column(String(50), index=True, nullable=True)  # Contact Number
     second_number = Column(String(50), nullable=True)  # Second Number (Optional)
@@ -101,16 +109,23 @@ class Student(Base):
     branch_specialization = Column(String(100), nullable=True)  # Computer Science, Mechanical, etc.
     current_year_sem = Column(String(100), nullable=True)  # 1st Year, 2nd Year, 3rd Year, 4th Year, etc.
 
-    # Cohort tracking
+    # Cohort & Milestone tracking
     academic_year = Column(String(50), index=True, nullable=True)  # e.g., "2026-27"
     passout_year = Column(Integer, index=True, nullable=True)  # e.g., 2027
+    passout_school_year = Column(Integer, nullable=True)
+    passout_college_year = Column(Integer, nullable=True)
+    education_history = Column(Text, nullable=True)
 
     # Location
     area_id = Column(Integer, ForeignKey("areas.id"), nullable=True, index=True)
     address = Column(Text, nullable=True)  # Address (Optional)
     near_masjid = Column(String(255), nullable=True)  # Near which Masjid? (Optional, voluntarily provided)
+    masjid = Column(String(255), nullable=True)  # Voluntary Masjid (Optional)
+    time_spent_in_jamaat = Column(String(100), nullable=True)  # Time Spent in Jamaat (Optional, voluntary)
+    time_in_jamaat = Column(String(100), nullable=True)  # Backward compatible alias
     
     # Status & Profession
+    last_mulakhat_date = Column(String(50), nullable=True)  # Last Mulakhat Date (Optional)
     current_status = Column(String(100), default="Currently Studying", nullable=False)  # Currently Studying, Passed Out, Other
     profession = Column(String(255), nullable=True)  # Software Engineer, Teacher, Business, Government Job, Student, Other
 
@@ -142,3 +157,14 @@ class AuditLog(Base):
     details = Column(Text, nullable=True)
     ip_address = Column(String(50), nullable=True)
     timestamp = Column(DateTime, default=datetime.datetime.utcnow, index=True)
+
+class Note(Base):
+    __tablename__ = "notes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow)
+
+    user = relationship("User", backref="notes")

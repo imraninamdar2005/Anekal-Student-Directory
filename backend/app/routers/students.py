@@ -25,12 +25,32 @@ def generate_student_id(db: Session) -> str:
         next_num += 1
 
 def sanitize_student_for_role(student: Student, role: str) -> dict:
+    is_authorized = role in ["Admin", "Data Manager"]
+
+    # Compute fallback for father/mother/guardian names
+    father_name = student.father_name
+    mother_name = student.mother_name
+    guardian_name = student.guardian_name
+    if not father_name and student.parent_guardian_relation == "Father":
+        father_name = student.parent_guardian_name
+    if not mother_name and student.parent_guardian_relation == "Mother":
+        mother_name = student.parent_guardian_name
+    if not guardian_name and student.parent_guardian_relation == "Guardian":
+        guardian_name = student.parent_guardian_name
+
+    # Masjid & Jamaat voluntary display
+    masjid_val = student.masjid or student.near_masjid
+    jamaat_val = student.time_spent_in_jamaat or student.time_in_jamaat
+
     data = {
         "id": student.id,
         "student_id": student.student_id,
         "full_name": student.full_name,
         "parent_guardian_relation": student.parent_guardian_relation or "Father",
         "parent_guardian_name": student.parent_guardian_name,
+        "father_name": father_name,
+        "mother_name": mother_name,
+        "guardian_name": guardian_name,
         "education_type": student.education_type,
         "school_id": student.school_id,
         "college_id": student.college_id,
@@ -42,10 +62,13 @@ def sanitize_student_for_role(student: Student, role: str) -> dict:
         "current_year_sem": student.current_year_sem,
         "academic_year": student.academic_year,
         "passout_year": student.passout_year,
+        "passout_school_year": student.passout_school_year,
+        "passout_college_year": student.passout_college_year,
+        "education_history": student.education_history,
         "area_id": student.area_id,
         "area_name": student.area.area_name if student.area else None,
         "address": student.address,
-        "near_masjid": student.near_masjid if student.near_masjid else "Not Provided",
+        "last_mulakhat_date": student.last_mulakhat_date,
         "current_status": student.current_status,
         "profession": student.profession,
         "created_at": student.created_at,
@@ -54,15 +77,29 @@ def sanitize_student_for_role(student: Student, role: str) -> dict:
         "updated_by": student.updated_by,
     }
 
-    # Privacy Protection: Viewers have redacted contact info
-    if role in ["Admin", "Data Manager"]:
+    # Privacy Protection: Viewers have redacted contact info and restricted voluntary fields
+    if is_authorized:
         data["contact_number"] = student.contact_number
         data["second_number"] = student.second_number
         data["second_number_relation"] = student.second_number_relation
+        data["father_contact"] = student.father_contact or (student.contact_number if student.parent_guardian_relation == "Father" else None)
+        data["mother_contact"] = student.mother_contact or (student.contact_number if student.parent_guardian_relation == "Mother" else None)
+        data["guardian_contact"] = student.guardian_contact or (student.contact_number if student.parent_guardian_relation == "Guardian" else None)
+        data["masjid"] = masjid_val if masjid_val else "Not Provided"
+        data["near_masjid"] = masjid_val if masjid_val else "Not Provided"
+        data["time_spent_in_jamaat"] = jamaat_val if jamaat_val else "Not Provided"
+        data["time_in_jamaat"] = jamaat_val if jamaat_val else "Not Provided"
     else:
         data["contact_number"] = "••••••••••" if student.contact_number else None
         data["second_number"] = "••••••••••" if student.second_number else None
         data["second_number_relation"] = student.second_number_relation if student.second_number else None
+        data["father_contact"] = "••••••••••" if (student.father_contact or (student.contact_number and student.parent_guardian_relation == "Father")) else None
+        data["mother_contact"] = "••••••••••" if (student.mother_contact or (student.contact_number and student.parent_guardian_relation == "Mother")) else None
+        data["guardian_contact"] = "••••••••••" if (student.guardian_contact or (student.contact_number and student.parent_guardian_relation == "Guardian")) else None
+        data["masjid"] = "Restricted"
+        data["near_masjid"] = "Restricted"
+        data["time_spent_in_jamaat"] = "Restricted"
+        data["time_in_jamaat"] = "Restricted"
 
     return data
 
@@ -95,27 +132,37 @@ def list_students(
     # Search filter
     if q and q.strip():
         term = f"%{q.strip()}%"
-        query = query.filter(
-            or_(
-                Student.student_id.ilike(term),
-                Student.full_name.ilike(term),
-                Student.parent_guardian_name.ilike(term),
-                Student.contact_number.ilike(term),
-                Student.second_number.ilike(term),
-                Student.class_or_standard.ilike(term),
-                Student.course_degree.ilike(term),
-                Student.branch_specialization.ilike(term),
-                Student.current_year_sem.ilike(term),
-                Student.academic_year.ilike(term),
-                Student.current_status.ilike(term),
-                Student.profession.ilike(term),
-                Student.address.ilike(term),
+        search_filters = [
+            Student.student_id.ilike(term),
+            Student.full_name.ilike(term),
+            Student.parent_guardian_name.ilike(term),
+            Student.father_name.ilike(term),
+            Student.mother_name.ilike(term),
+            Student.guardian_name.ilike(term),
+            Student.contact_number.ilike(term),
+            Student.second_number.ilike(term),
+            Student.class_or_standard.ilike(term),
+            Student.course_degree.ilike(term),
+            Student.branch_specialization.ilike(term),
+            Student.current_year_sem.ilike(term),
+            Student.academic_year.ilike(term),
+            Student.current_status.ilike(term),
+            Student.profession.ilike(term),
+            Student.address.ilike(term),
+            School.school_name.ilike(term),
+            College.college_name.ilike(term),
+            Area.area_name.ilike(term),
+        ]
+        # Only authorized users can search across private contacts and voluntary masjid
+        if current_user.role in ["Admin", "Data Manager"]:
+            search_filters.extend([
+                Student.father_contact.ilike(term),
+                Student.mother_contact.ilike(term),
+                Student.guardian_contact.ilike(term),
+                Student.masjid.ilike(term),
                 Student.near_masjid.ilike(term),
-                School.school_name.ilike(term),
-                College.college_name.ilike(term),
-                Area.area_name.ilike(term),
-            )
-        )
+            ])
+        query = query.filter(or_(*search_filters))
 
     # Multi-filters
     if education_type and education_type != "All":
@@ -146,7 +193,7 @@ def list_students(
 
     total_count = query.count()
 
-    # Sorting
+    # Dynamic sorting
     sort_column = getattr(Student, sort_by, Student.created_at)
     if sort_dir.lower() == "desc":
         query = query.order_by(desc(sort_column))
@@ -184,26 +231,48 @@ def create_student(
     if db.query(Student).filter(Student.student_id == student_id).first():
         student_id = generate_student_id(db)
 
+    masjid_val = (payload.masjid.strip() if payload.masjid else None) or (payload.near_masjid.strip() if payload.near_masjid else None)
+    jamaat_val = (payload.time_spent_in_jamaat.strip() if payload.time_spent_in_jamaat else None) or (payload.time_in_jamaat.strip() if payload.time_in_jamaat else None)
+
+    contact_num = payload.contact_number.strip() if payload.contact_number else None
+    if not contact_num:
+        contact_num = payload.father_contact or payload.mother_contact or payload.guardian_contact
+
+    passout_yr = payload.passout_year or payload.passout_college_year or payload.passout_school_year
+
     student = Student(
         student_id=student_id,
         full_name=payload.full_name.strip(),
         parent_guardian_relation=payload.parent_guardian_relation or "Father",
         parent_guardian_name=payload.parent_guardian_name.strip() if payload.parent_guardian_name else None,
-        contact_number=payload.contact_number.strip() if payload.contact_number else None,
+        father_name=payload.father_name.strip() if payload.father_name else None,
+        father_contact=payload.father_contact.strip() if payload.father_contact else None,
+        mother_name=payload.mother_name.strip() if payload.mother_name else None,
+        mother_contact=payload.mother_contact.strip() if payload.mother_contact else None,
+        guardian_name=payload.guardian_name.strip() if payload.guardian_name else None,
+        guardian_contact=payload.guardian_contact.strip() if payload.guardian_contact else None,
+        contact_number=contact_num,
         second_number=payload.second_number.strip() if payload.second_number else None,
         second_number_relation=payload.second_number_relation if payload.second_number else "Parent",
         education_type=payload.education_type,
-        school_id=payload.school_id if payload.education_type == "School" else None,
-        college_id=payload.college_id if payload.education_type == "College / University" else None,
-        class_or_standard=payload.class_or_standard if payload.education_type == "School" else None,
-        course_degree=payload.course_degree if payload.education_type == "College / University" else None,
-        branch_specialization=payload.branch_specialization if payload.education_type == "College / University" else None,
-        current_year_sem=payload.current_year_sem if payload.education_type == "College / University" else None,
+        school_id=payload.school_id,
+        college_id=payload.college_id,
+        class_or_standard=payload.class_or_standard,
+        course_degree=payload.course_degree,
+        branch_specialization=payload.branch_specialization,
+        current_year_sem=payload.current_year_sem,
         academic_year=payload.academic_year,
-        passout_year=payload.passout_year,
+        passout_year=passout_yr,
+        passout_school_year=payload.passout_school_year,
+        passout_college_year=payload.passout_college_year,
+        education_history=payload.education_history,
         area_id=payload.area_id,
         address=payload.address.strip() if payload.address else None,
-        near_masjid=payload.near_masjid.strip() if payload.near_masjid else None,
+        near_masjid=masjid_val,
+        masjid=masjid_val,
+        time_spent_in_jamaat=jamaat_val,
+        time_in_jamaat=jamaat_val,
+        last_mulakhat_date=payload.last_mulakhat_date.strip() if payload.last_mulakhat_date else None,
         current_status=payload.current_status,
         profession=payload.profession if payload.current_status == "Passed Out" else None,
         created_by=current_user.username,
@@ -236,8 +305,24 @@ def update_student(
         raise HTTPException(status_code=404, detail="Student record not found")
 
     update_dict = payload.model_dump(exclude_unset=True)
+    if "masjid" in update_dict or "near_masjid" in update_dict:
+        m_val = update_dict.get("masjid") or update_dict.get("near_masjid")
+        update_dict["masjid"] = m_val
+        update_dict["near_masjid"] = m_val
+    if "time_spent_in_jamaat" in update_dict or "time_in_jamaat" in update_dict:
+        j_val = update_dict.get("time_spent_in_jamaat") or update_dict.get("time_in_jamaat")
+        update_dict["time_spent_in_jamaat"] = j_val
+        update_dict["time_in_jamaat"] = j_val
+    if "last_mulakhat_date" in update_dict:
+        l_val = update_dict.get("last_mulakhat_date")
+        update_dict["last_mulakhat_date"] = l_val.strip() if (isinstance(l_val, str) and l_val.strip()) else None
+
     for field, value in update_dict.items():
         setattr(student, field, value)
+
+    # Sync passout_year if milestones provided but not passout_year
+    if ("passout_college_year" in update_dict or "passout_school_year" in update_dict) and "passout_year" not in update_dict:
+        student.passout_year = student.passout_college_year or student.passout_school_year or student.passout_year
 
     student.updated_by = current_user.username
     student.updated_at = datetime.datetime.utcnow()

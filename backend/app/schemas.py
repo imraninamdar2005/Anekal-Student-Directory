@@ -9,6 +9,7 @@ class Token(BaseModel):
     role: str
     username: str
     full_name: str
+    id: Optional[int] = None
 
 class TokenData(BaseModel):
     username: Optional[str] = None
@@ -28,6 +29,7 @@ class UserCreate(UserBase):
     password: str
 
 class UserUpdate(BaseModel):
+    username: Optional[str] = None
     email: Optional[EmailStr] = None
     full_name: Optional[str] = None
     role: Optional[str] = None
@@ -126,6 +128,14 @@ class StudentBase(BaseModel):
     parent_guardian_relation: Optional[str] = "Father"  # Father, Mother, Guardian, Other
     parent_guardian_name: Optional[str] = None
     
+    # Separate Father, Mother, Guardian Information & Contacts (Optional)
+    father_name: Optional[str] = None
+    father_contact: Optional[str] = None
+    mother_name: Optional[str] = None
+    mother_contact: Optional[str] = None
+    guardian_name: Optional[str] = None
+    guardian_contact: Optional[str] = None
+
     contact_number: Optional[str] = None
     second_number: Optional[str] = None
     second_number_relation: Optional[str] = "Parent"  # Parent, Guardian, Alternate Contact
@@ -141,20 +151,27 @@ class StudentBase(BaseModel):
 
     academic_year: Optional[str] = None  # e.g., "2026-27"
     passout_year: Optional[int] = None  # e.g., 2027
+    passout_school_year: Optional[int] = None
+    passout_college_year: Optional[int] = None
+    education_history: Optional[str] = None
 
     area_id: Optional[int] = None
     address: Optional[str] = None
     near_masjid: Optional[str] = None  # Near which Masjid? (Optional)
+    masjid: Optional[str] = None  # Voluntary Masjid (Optional)
+    time_spent_in_jamaat: Optional[str] = None  # Time Spent in Jamaat (Optional)
+    time_in_jamaat: Optional[str] = None
+    last_mulakhat_date: Optional[str] = None  # Last Mulakhat Date (Optional)
     
     current_status: str = "Currently Studying"  # Currently Studying, Passed Out, Other
     profession: Optional[str] = None
 
-    @field_validator("contact_number", "second_number")
+    @field_validator("contact_number", "second_number", "father_contact", "mother_contact", "guardian_contact")
     @classmethod
     def validate_contact(cls, v):
         if v:
             clean = "".join(filter(str.isdigit, str(v)))
-            if len(clean) < 7 or len(clean) > 15:
+            if clean and (len(clean) < 7 or len(clean) > 15):
                 raise ValueError("Contact number must contain between 7 and 15 digits.")
         return v
 
@@ -165,6 +182,14 @@ class StudentUpdate(BaseModel):
     full_name: Optional[str] = None
     parent_guardian_relation: Optional[str] = None
     parent_guardian_name: Optional[str] = None
+
+    father_name: Optional[str] = None
+    father_contact: Optional[str] = None
+    mother_name: Optional[str] = None
+    mother_contact: Optional[str] = None
+    guardian_name: Optional[str] = None
+    guardian_contact: Optional[str] = None
+
     contact_number: Optional[str] = None
     second_number: Optional[str] = None
     second_number_relation: Optional[str] = None
@@ -180,11 +205,29 @@ class StudentUpdate(BaseModel):
 
     academic_year: Optional[str] = None
     passout_year: Optional[int] = None
+    passout_school_year: Optional[int] = None
+    passout_college_year: Optional[int] = None
+    education_history: Optional[str] = None
+
     area_id: Optional[int] = None
     address: Optional[str] = None
     near_masjid: Optional[str] = None
+    masjid: Optional[str] = None
+    time_spent_in_jamaat: Optional[str] = None
+    time_in_jamaat: Optional[str] = None
+    last_mulakhat_date: Optional[str] = None
+
     current_status: Optional[str] = None
     profession: Optional[str] = None
+
+    @field_validator("contact_number", "second_number", "father_contact", "mother_contact", "guardian_contact")
+    @classmethod
+    def validate_contact(cls, v):
+        if v:
+            clean = "".join(filter(str.isdigit, str(v)))
+            if clean and (len(clean) < 7 or len(clean) > 15):
+                raise ValueError("Contact number must contain between 7 and 15 digits.")
+        return v
 
 class StudentOut(StudentBase):
     id: int
@@ -261,5 +304,24 @@ class AuditLogOut(BaseModel):
     details: Optional[str]
     ip_address: Optional[str]
     timestamp: datetime.datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+# --- Note Schemas ---
+class NoteBase(BaseModel):
+    content: str
+
+class NoteCreate(BaseModel):
+    content: str
+
+class NoteUpdate(BaseModel):
+    content: str
+
+class NoteOut(BaseModel):
+    id: int
+    user_id: int
+    content: str
+    created_at: datetime.datetime
+    updated_at: datetime.datetime
 
     model_config = ConfigDict(from_attributes=True)

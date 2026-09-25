@@ -1,3 +1,4 @@
+from sqlalchemy import func
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.database import get_db
@@ -9,10 +10,16 @@ router = APIRouter(prefix="/api/auth", tags=["Authentication"])
 
 @router.post("/login", response_model=Token)
 def login(login_data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == login_data.username).first()
+    input_identifier = login_data.username.strip() if login_data.username else ""
+    user = db.query(User).filter(User.username == input_identifier).first()
     if not user:
         # Also try email
-        user = db.query(User).filter(User.email == login_data.username).first()
+        user = db.query(User).filter(User.email == input_identifier).first()
+    if not user:
+        # Fallback to case-insensitive match
+        user = db.query(User).filter(func.lower(User.username) == input_identifier.lower()).first()
+    if not user:
+        user = db.query(User).filter(func.lower(User.email) == input_identifier.lower()).first()
     
     if not user or not verify_password(login_data.password, user.hashed_password):
         raise HTTPException(
@@ -32,7 +39,8 @@ def login(login_data: LoginRequest, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "role": user.role,
         "username": user.username,
-        "full_name": user.full_name
+        "full_name": user.full_name,
+        "id": user.id
     }
 
 @router.get("/me", response_model=UserOut)

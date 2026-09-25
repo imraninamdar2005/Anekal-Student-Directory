@@ -56,13 +56,23 @@ async def preview_import_file(
         parent_relation = row_dict.get("Parent / Guardian Relation") or row_dict.get("Parent Relation") or "Father"
         parent_name = row_dict.get("Parent / Guardian Name") or row_dict.get("Parent Name") or ""
         
-        contact_number = row_dict.get("Contact Number") or row_dict.get("Phone") or row_dict.get("Primary Contact") or ""
+        # Separate father, mother, guardian contacts
+        father_name = row_dict.get("Father Name") or row_dict.get("Father") or ""
+        father_contact = row_dict.get("Father Contact") or row_dict.get("Father Phone") or ""
+        mother_name = row_dict.get("Mother Name") or row_dict.get("Mother") or ""
+        mother_contact = row_dict.get("Mother Contact") or row_dict.get("Mother Phone") or ""
+        guardian_name = row_dict.get("Guardian Name") or row_dict.get("Guardian") or ""
+        guardian_contact = row_dict.get("Guardian Contact") or row_dict.get("Guardian Phone") or ""
+
+        contact_number = row_dict.get("Contact Number") or row_dict.get("Phone") or row_dict.get("Primary Contact") or father_contact or mother_contact or guardian_contact or ""
         second_number = row_dict.get("Second Number") or row_dict.get("Additional Contact") or ""
         second_relation = row_dict.get("Second Number Relation") or row_dict.get("Whose Number") or "Parent"
 
         education_type = row_dict.get("Education Type") or "School"
         school_name = row_dict.get("School") or row_dict.get("School Name") or ""
         college_name = row_dict.get("College / University") or row_dict.get("College") or row_dict.get("University") or ""
+        if college_name and college_name.lower() in ["not joined yet", "not joined", "none", "—", "-"]:
+            college_name = ""
 
         if college_name and not school_name:
             education_type = "College / University"
@@ -72,11 +82,25 @@ async def preview_import_file(
         branch_specialization = row_dict.get("Branch") or row_dict.get("Branch / Specialization") or ""
         current_year_sem = row_dict.get("Year / Semester") or row_dict.get("Current Year") or ""
 
+        # Support "Currently Studying" label from exports/imports
+        currently_studying = row_dict.get("Currently Studying") or ""
+        if currently_studying and not class_or_standard and not course_degree:
+            if any(term in currently_studying for term in ["—", "Year", "BE", "BTech", "Degree", "College"]):
+                course_degree = currently_studying
+            else:
+                class_or_standard = currently_studying
+
         academic_year = row_dict.get("Academic Year") or "2026-27"
         passout_year_str = row_dict.get("Passout Year") or ""
+        passout_school_str = row_dict.get("Passout School Year") or row_dict.get("10th Passout Year") or ""
+        passout_college_str = row_dict.get("Passout College Year") or row_dict.get("College Passout Year") or ""
+        education_history = row_dict.get("Education History") or row_dict.get("Milestones") or ""
+
         area_name = row_dict.get("Area") or ""
         address = row_dict.get("Address") or ""
-        near_masjid = row_dict.get("Near which Masjid?") or row_dict.get("Near Masjid") or ""
+        masjid = row_dict.get("Masjid") or row_dict.get("Near which Masjid?") or row_dict.get("Near Masjid") or ""
+        time_spent_in_jamaat = row_dict.get("Time Spent in Jamaat") or row_dict.get("Time in Jamaat") or ""
+        last_mulakhat_date = row_dict.get("Last Mulakhat Date") or row_dict.get("Mulakhat Date") or ""
         current_status = row_dict.get("Status") or "Currently Studying"
         profession = row_dict.get("Profession") or ""
 
@@ -90,6 +114,20 @@ async def preview_import_file(
             except ValueError:
                 errors.append("Passout Year must be a 4-digit year.")
 
+        passout_school_year = None
+        if passout_school_str:
+            try:
+                passout_school_year = int(float(passout_school_str))
+            except ValueError:
+                pass
+
+        passout_college_year = None
+        if passout_college_str:
+            try:
+                passout_college_year = int(float(passout_college_str))
+            except ValueError:
+                pass
+
         # Duplicate check
         if full_name:
             existing = db.query(Student).filter(Student.full_name.ilike(full_name)).first()
@@ -101,6 +139,12 @@ async def preview_import_file(
             "full_name": full_name,
             "parent_guardian_relation": parent_relation,
             "parent_guardian_name": parent_name,
+            "father_name": father_name,
+            "father_contact": father_contact,
+            "mother_name": mother_name,
+            "mother_contact": mother_contact,
+            "guardian_name": guardian_name,
+            "guardian_contact": guardian_contact,
             "contact_number": contact_number,
             "second_number": second_number,
             "second_number_relation": second_relation,
@@ -115,10 +159,17 @@ async def preview_import_file(
             "current_year_sem": current_year_sem,
             "academic_year": academic_year,
             "passout_year": passout_year,
+            "passout_school_year": passout_school_year,
+            "passout_college_year": passout_college_year,
+            "education_history": education_history,
             "area_id": areas.get(area_name.lower()) if area_name else None,
             "area_name": area_name,
             "address": address,
-            "near_masjid": near_masjid,
+            "near_masjid": masjid,
+            "masjid": masjid,
+            "time_spent_in_jamaat": time_spent_in_jamaat,
+            "time_in_jamaat": time_spent_in_jamaat,
+            "last_mulakhat_date": last_mulakhat_date.strip() if last_mulakhat_date else None,
             "current_status": current_status,
             "profession": profession,
         }
@@ -180,12 +231,23 @@ def commit_import(
             if ar:
                 area_id = ar.id
 
+        masjid_val = row.get("masjid", "").strip() or row.get("near_masjid", "").strip() or None
+        jamaat_val = row.get("time_spent_in_jamaat", "").strip() or row.get("time_in_jamaat", "").strip() or None
+        contact_num = row.get("contact_number", "").strip() or row.get("father_contact", "").strip() or row.get("mother_contact", "").strip() or row.get("guardian_contact", "").strip() or None
+        passout_yr = row.get("passout_year") or row.get("passout_college_year") or row.get("passout_school_year")
+
         student = Student(
             student_id=student_id,
             full_name=row.get("full_name", "").strip(),
             parent_guardian_relation=row.get("parent_guardian_relation", "Father"),
             parent_guardian_name=row.get("parent_guardian_name", "").strip() or None,
-            contact_number=row.get("contact_number", "").strip() or None,
+            father_name=row.get("father_name", "").strip() or None,
+            father_contact=row.get("father_contact", "").strip() or None,
+            mother_name=row.get("mother_name", "").strip() or None,
+            mother_contact=row.get("mother_contact", "").strip() or None,
+            guardian_name=row.get("guardian_name", "").strip() or None,
+            guardian_contact=row.get("guardian_contact", "").strip() or None,
+            contact_number=contact_num,
             second_number=row.get("second_number", "").strip() or None,
             second_number_relation=row.get("second_number_relation", "Parent"),
             education_type=row.get("education_type", "School"),
@@ -196,10 +258,17 @@ def commit_import(
             branch_specialization=row.get("branch_specialization", "").strip() or None,
             current_year_sem=row.get("current_year_sem", "").strip() or None,
             academic_year=row.get("academic_year", "").strip() or "2026-27",
-            passout_year=row.get("passout_year"),
+            passout_year=passout_yr,
+            passout_school_year=row.get("passout_school_year"),
+            passout_college_year=row.get("passout_college_year"),
+            education_history=row.get("education_history", "").strip() or None,
             area_id=area_id,
             address=row.get("address", "").strip() or None,
-            near_masjid=row.get("near_masjid", "").strip() or None,
+            near_masjid=masjid_val,
+            masjid=masjid_val,
+            time_spent_in_jamaat=jamaat_val,
+            time_in_jamaat=jamaat_val,
+            last_mulakhat_date=row.get("last_mulakhat_date", "").strip() or None,
             current_status=row.get("current_status", "Currently Studying"),
             profession=row.get("profession", "").strip() or None,
             created_by=current_user.username,
@@ -287,21 +356,69 @@ def export_students(
     is_authorized = current_user.role in ["Admin", "Data Manager"]
 
     for s in students:
+        # Determine separate father, mother, guardian contacts
+        father_name = s.father_name or (s.parent_guardian_name if s.parent_guardian_relation == "Father" else "")
+        mother_name = s.mother_name or (s.parent_guardian_name if s.parent_guardian_relation == "Mother" else "")
+        guardian_name = s.guardian_name or (s.parent_guardian_name if s.parent_guardian_relation == "Guardian" else "")
+
+        father_contact = s.father_contact or (s.contact_number if s.parent_guardian_relation == "Father" else "")
+        mother_contact = s.mother_contact or (s.contact_number if s.parent_guardian_relation == "Mother" else "")
+        guardian_contact = s.guardian_contact or (s.contact_number if s.parent_guardian_relation == "Guardian" else "")
+
+        # Compute milestone string
+        milestones = []
+        if s.passout_school_year:
+            milestones.append(f"{s.passout_school_year} (10th)")
+        if s.passout_college_year:
+            milestones.append(f"{s.passout_college_year} (College)")
+        if not milestones and s.passout_year:
+            if s.education_type == "School":
+                milestones.append(f"{s.passout_year} (10th)")
+            else:
+                milestones.append(f"{s.passout_year} (College)")
+        edu_milestones_str = s.education_history or (" • ".join(milestones) if milestones else (str(s.passout_year) if s.passout_year else ""))
+
+        # Currently Studying label
+        if s.current_status == "Passed Out":
+            studying_str = f"Completed: {s.class_or_standard or s.course_degree or 'Passed Out'}"
+        else:
+            if s.education_type == "School":
+                studying_str = s.class_or_standard or "School"
+            else:
+                studying_str = f"{s.course_degree or 'Degree'}{(' ' + s.branch_specialization) if s.branch_specialization else ''}{(' — ' + s.current_year_sem) if s.current_year_sem else ''}"
+
+        # School and College separate
+        school_val = s.school.school_name if s.school else ""
+        college_val = s.college.college_name if s.college else ("Not joined yet" if (s.education_type == "School" or not s.college_id) else "")
+
         row = {
             "Student ID": s.student_id,
             "Student Name": s.full_name,
+            "Father Name": father_name,
+            "Father Contact": father_contact if is_authorized else ("••••••••••" if father_contact else ""),
+            "Mother Name": mother_name,
+            "Mother Contact": mother_contact if is_authorized else ("••••••••••" if mother_contact else ""),
+            "Guardian Name": guardian_name,
+            "Guardian Contact": guardian_contact if is_authorized else ("••••••••••" if guardian_contact else ""),
             "Parent / Guardian Relation": s.parent_guardian_relation or "Father",
             "Parent / Guardian Name": s.parent_guardian_name if is_authorized else "••••••••••",
             "Contact Number": s.contact_number if is_authorized else "••••••••••",
             "Second Number": s.second_number if is_authorized else ("••••••••••" if s.second_number else ""),
             "Second Number Relation": s.second_number_relation or "Parent",
+            "School": school_val,
+            "College / University": college_val,
             "School / College": (s.school.school_name if s.school else "") or (s.college.college_name if s.college else ""),
             "Education Type": s.education_type,
+            "Currently Studying": studying_str,
             "Class / Course": s.class_or_standard or s.course_degree or "",
             "Branch": s.branch_specialization or "",
             "Academic Year": s.academic_year or "",
             "Passout Year": s.passout_year or "",
+            "Education History": edu_milestones_str,
             "Area": s.area.area_name if s.area else "",
+            "Masjid": (s.masjid or s.near_masjid or "Not Provided") if is_authorized else "Restricted",
+            "Time Spent in Jamaat": (s.time_spent_in_jamaat or s.time_in_jamaat or "Not Provided") if is_authorized else "Restricted",
+            "Last Mulakhat Date": s.last_mulakhat_date or "Not Provided",
             "Address": s.address or "",
             "Status": s.current_status,
             "Profession": s.profession or "",

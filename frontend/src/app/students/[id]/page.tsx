@@ -59,6 +59,33 @@ export default function StudentDetailsPage() {
     }
   };
 
+  const formatDetailMulakhatDate = (dateStr?: string | null) => {
+    if (!dateStr || dateStr.trim() === '' || dateStr === 'Not Provided') {
+      return 'Not Provided';
+    }
+    try {
+      const clean = dateStr.split('T')[0];
+      const parts = clean.split('-');
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number);
+        const fullMonths = [
+          'January', 'February', 'March', 'April', 'May', 'June',
+          'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+          return `${d} ${fullMonths[m - 1]} ${y}`;
+        }
+      }
+      const dt = new Date(dateStr);
+      if (!isNaN(dt.getTime())) {
+        return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
   if (loading) {
     return (
       <AppShell>
@@ -140,179 +167,362 @@ export default function StudentDetailsPage() {
 
         {/* Profile Card Sections */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Section 1: Basic & Contact Info */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-            <div className="border-b border-slate-100 pb-3">
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <User className="w-4 h-4 text-sky-600" />
-                Student &amp; Family Information
+          {/* SECTION 1: STUDENT INFORMATION */}
+          <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
+                <User className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                Student Information
               </h2>
+              <Badge variant={student.current_status === 'Passed Out' ? 'success' : 'info'}>
+                {student.current_status}
+              </Badge>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Student Name</span>
-                <span className="font-bold text-slate-800">{student.full_name}</span>
+              <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Student ID</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{student.student_id}</span>
               </div>
-              {student.parent_guardian_name && (
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-500 font-medium">Parent / Guardian</span>
-                  <span className="font-semibold text-slate-800">
-                    {student.parent_guardian_name}
-                    <span className="text-slate-500 text-[11px] block text-right font-normal">
-                      ({student.parent_guardian_relation || 'Parent'})
-                    </span>
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Contact Number</span>
-                <span className="font-mono font-semibold text-slate-800">{student.contact_number || 'None provided'}</span>
+              <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Student Name</span>
+                <span className="font-bold text-slate-800 dark:text-slate-100">{student.full_name}</span>
               </div>
-              {student.second_number && (
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-500 font-medium">Second Number ({student.second_number_relation || 'Parent'})</span>
-                  <span className="font-mono text-slate-800">{student.second_number}</span>
-                </div>
-              )}
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500 font-medium">Area</span>
-                <span className="font-semibold text-slate-800 flex items-center gap-1">
+              <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Status</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200">{student.current_status}</span>
+              </div>
+              <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Area</span>
+                <span className="font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
                   <MapPin className="w-3.5 h-3.5 text-slate-400" />
                   {student.area_name || 'Anekal'}
                 </span>
               </div>
               {student.address && (
-                <div className="flex justify-between py-1 border-t border-slate-50">
-                  <span className="text-slate-500 font-medium">Address</span>
-                  <span className="text-slate-800 font-medium text-right">{student.address}</span>
+                <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Address</span>
+                  <span className="text-slate-800 dark:text-slate-200 font-medium text-right max-w-[240px]">{student.address}</span>
                 </div>
               )}
-              {student.near_masjid && student.near_masjid !== 'Not Provided' && (
-                <div className="flex justify-between py-1 border-t border-slate-50">
-                  <span className="text-slate-500 font-medium">Near which Masjid?</span>
-                  <span className="text-slate-800 font-medium text-right">{student.near_masjid}</span>
+              {student.profession && (
+                <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Profession</span>
+                  <span className="font-semibold text-emerald-600 dark:text-emerald-400">{student.profession}</span>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Section 2: Education Profile */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-            <div className="border-b border-slate-100 pb-3">
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <GraduationCap className="w-4 h-4 text-indigo-600" />
-                Education Details
+          {/* SECTION 2: FAMILY / CONTACT */}
+          <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
+                <Phone className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                Family / Contact
               </h2>
+              {isViewer && (
+                <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/60 font-medium">
+                  Privacy Protected
+                </span>
+              )}
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Education Type</span>
-                <Badge variant={student.education_type === 'School' ? 'warning' : 'purple'}>
-                  {student.education_type}
-                </Badge>
-              </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Institution</span>
-                <span className="font-semibold text-slate-800">
-                  {student.school_name || student.college_name || 'Individual Record'}
-                </span>
-              </div>
-              {student.education_type === 'School' ? (
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-500 font-medium">Current Class</span>
-                  <span className="font-bold text-slate-800">{student.class_or_standard}</span>
+              {/* Father */}
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold">Father</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {student.father_name || (student.parent_guardian_relation === 'Father' ? student.parent_guardian_name : '—')}
+                  </span>
                 </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400 dark:text-slate-500 font-medium">Father Contact</span>
+                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                    {student.father_contact || (student.parent_guardian_relation === 'Father' ? student.contact_number : '—')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Mother */}
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold">Mother</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {student.mother_name || (student.parent_guardian_relation === 'Mother' ? student.parent_guardian_name : '—')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400 dark:text-slate-500 font-medium">Mother Contact</span>
+                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                    {student.mother_contact || (student.parent_guardian_relation === 'Mother' ? student.contact_number : '—')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Guardian */}
+              <div className="p-2.5 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-slate-500 dark:text-slate-400 font-semibold">Guardian</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {student.guardian_name || (student.parent_guardian_relation === 'Guardian' ? student.parent_guardian_name : '—')}
+                  </span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-slate-400 dark:text-slate-500 font-medium">Guardian Contact</span>
+                  <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                    {student.guardian_contact || (student.parent_guardian_relation === 'Guardian' ? student.contact_number : '—')}
+                  </span>
+                </div>
+              </div>
+
+              {/* Existing Contact Number */}
+              <div className="flex justify-between py-1 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Primary Contact Number</span>
+                <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{student.contact_number || '—'}</span>
+              </div>
+              {student.second_number && (
+                <div className="flex justify-between py-1 border-t border-slate-50 dark:border-slate-800/60">
+                  <span className="text-slate-500 dark:text-slate-400 font-medium">Second Number ({student.second_number_relation || 'Parent'})</span>
+                  <span className="font-mono text-slate-800 dark:text-slate-200">{student.second_number}</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* SECTION 3: EDUCATION */}
+          <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
+                <GraduationCap className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                Education
+              </h2>
+              <Badge variant={student.education_type === 'School' ? 'warning' : 'purple'}>
+                {student.education_type}
+              </Badge>
+            </div>
+
+            <div className="space-y-3 text-xs">
+              {student.education_type === 'School' ? (
+                <>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Current School</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200 max-w-[230px] text-right">
+                      {student.school_name || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Class</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">
+                      {student.class_or_standard || '—'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Academic Year</span>
+                    <span className="font-semibold text-slate-800 dark:text-slate-200">{student.academic_year || '—'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Currently Studying</span>
+                    <span className="font-bold text-sky-700 dark:text-sky-300">
+                      {student.current_status === 'Passed Out' ? (
+                        <span className="italic text-slate-500">Completed ({student.class_or_standard || 'Passed Out'})</span>
+                      ) : (
+                        student.currently_studying || student.class_or_standard || 'School'
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Passout Year</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{student.passout_school_year || student.passout_year || '—'}</span>
+                  </div>
+                </>
               ) : (
                 <>
-                  <div className="flex justify-between py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-medium">Course / Degree</span>
-                    <span className="font-bold text-slate-800">{student.course_degree || '—'}</span>
-                  </div>
-                  {student.branch_specialization && (
-                    <div className="flex justify-between py-1 border-b border-slate-50">
-                      <span className="text-slate-500 font-medium">Branch / Specialization</span>
-                      <span className="text-slate-800">{student.branch_specialization}</span>
+                  {/* Previous School Card */}
+                  <div className="p-3 bg-amber-50/50 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/30 rounded-xl space-y-1.5">
+                    <span className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider block">
+                      Previous School Information
+                    </span>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">Previous School</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-right max-w-[210px]">
+                        {student.school_name || '—'}
+                      </span>
                     </div>
-                  )}
-                  <div className="flex justify-between py-1 border-b border-slate-50">
-                    <span className="text-slate-500 font-medium">Year / Semester</span>
-                    <span className="text-slate-800">{student.current_year_sem || '—'}</span>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">School Passout Year</span>
+                      <span className="font-mono font-semibold text-slate-700 dark:text-slate-300">
+                        {student.passout_school_year || '—'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Current College / University Card */}
+                  <div className="p-3 bg-indigo-50/50 dark:bg-indigo-950/20 border border-indigo-200/70 dark:border-indigo-900/30 rounded-xl space-y-1.5">
+                    <span className="text-[10px] font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wider block">
+                      Current College / University Information
+                    </span>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">College / University</span>
+                      <span className="font-bold text-slate-800 dark:text-slate-200 text-right max-w-[210px]">
+                        {student.college_name || '—'}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">Course</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{student.course_degree || '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">Branch</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{student.branch_specialization || '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">Current Year</span>
+                      <span className="font-semibold text-slate-700 dark:text-slate-300">{student.current_year_sem || '—'}</span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">Academic Year</span>
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">{student.academic_year || '—'}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Currently Studying</span>
+                    <span className="font-bold text-sky-700 dark:text-sky-300">
+                      {student.current_status === 'Passed Out' ? (
+                        <span className="italic text-slate-500">Completed ({student.course_degree || 'Passed Out'})</span>
+                      ) : (
+                        student.currently_studying || `${student.course_degree || ''}${student.branch_specialization ? ` (${student.branch_specialization})` : ''}${student.current_year_sem ? ` — ${student.current_year_sem}` : ''}`.trim() || 'College'
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                    <span className="text-slate-500 dark:text-slate-400 font-medium">Passout Year (College)</span>
+                    <span className="font-bold text-slate-800 dark:text-slate-200">{student.passout_college_year || student.passout_year || '—'}</span>
                   </div>
                 </>
               )}
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Academic Year</span>
-                <span className="font-semibold text-slate-800">{student.academic_year || '—'}</span>
-              </div>
-              <div className="flex justify-between py-1">
-                <span className="text-slate-500 font-medium">Expected Passout Year</span>
-                <span className="font-bold text-slate-800">{student.passout_year || '—'}</span>
+              
+              {/* Education History / Milestones */}
+              <div className="pt-2">
+                <span className="text-slate-500 dark:text-slate-400 font-semibold block mb-2">Education History / Milestones</span>
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-xl space-y-1.5 border border-slate-100 dark:border-slate-800">
+                  {student.education_history ? (
+                    <div className="whitespace-pre-line text-slate-700 dark:text-slate-300 font-medium">{student.education_history}</div>
+                  ) : (
+                    <>
+                      {student.passout_school_year && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-600 dark:text-slate-400 font-medium">School Milestone</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{student.passout_school_year} (10th)</span>
+                        </div>
+                      )}
+                      {student.passout_college_year && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-600 dark:text-slate-400 font-medium">College Milestone</span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">{student.passout_college_year} (College)</span>
+                        </div>
+                      )}
+                      {!student.passout_school_year && !student.passout_college_year && student.passout_year && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-slate-600 dark:text-slate-400 font-medium">
+                            {student.education_type === 'School' ? 'School Milestone' : 'College Milestone'}
+                          </span>
+                          <span className="font-bold text-slate-800 dark:text-slate-200 font-mono">
+                            {student.passout_year} {student.education_type === 'School' ? '(10th)' : '(College)'}
+                          </span>
+                        </div>
+                      )}
+                      {!student.passout_school_year && !student.passout_college_year && !student.passout_year && (
+                        <span className="text-slate-400 dark:text-slate-500 italic text-xs">No milestones recorded</span>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Section 3: Status & Profession (if passed out) */}
-          {student.current_status === 'Passed Out' && student.profession && (
-            <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-              <div className="border-b border-slate-100 pb-3">
-                <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-emerald-600" />
-                  Alumni Status &amp; Profession
-                </h2>
-              </div>
+          {/* SECTION 4: ADDITIONAL INFORMATION */}
+          <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3 flex items-center justify-between">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2 uppercase tracking-wider">
+                <Home className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                Additional Information
+              </h2>
+              {isViewer && (
+                <span className="text-[10px] bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-400 px-2 py-0.5 rounded-full border border-amber-200 dark:border-amber-800/60 font-medium">
+                  Private &bull; Authorized Only
+                </span>
+              )}
+            </div>
 
-              <div className="space-y-3 text-xs">
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-500 font-medium">Status</span>
-                  <span className="font-bold text-slate-800">{student.current_status}</span>
-                </div>
-                <div className="flex justify-between py-1 border-b border-slate-50">
-                  <span className="text-slate-500 font-medium">Profession / Occupation</span>
-                  <span className="font-semibold text-emerald-700">{student.profession}</span>
-                </div>
-                <div className="flex justify-between py-1">
-                  <span className="text-slate-500 font-medium">Passout Year</span>
-                  <span className="text-slate-800 font-bold">{student.passout_year}</span>
-                </div>
+            <div className="space-y-3 text-xs">
+              <div className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Masjid (Voluntary)</span>
+                {isViewer ? (
+                  <span className="text-slate-400 dark:text-slate-500 italic">Restricted</span>
+                ) : student.masjid && student.masjid !== 'Not Provided' ? (
+                  <span className="font-bold text-slate-800 dark:text-slate-200 text-right">{student.masjid}</span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500 italic">Not Provided</span>
+                )}
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Time Spent in Jamaat</span>
+                {isViewer ? (
+                  <span className="text-slate-400 dark:text-slate-500 italic">Restricted</span>
+                ) : student.time_spent_in_jamaat && student.time_spent_in_jamaat !== 'Not Provided' ? (
+                  <span className="font-bold text-slate-800 dark:text-slate-200 text-right">{student.time_spent_in_jamaat}</span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500 italic">Not Provided</span>
+                )}
+              </div>
+              <div className="flex justify-between py-2 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Last Mulakhat Date</span>
+                {student.last_mulakhat_date && student.last_mulakhat_date !== 'Not Provided' ? (
+                  <span className="font-bold text-slate-800 dark:text-slate-200 text-right">{formatDetailMulakhatDate(student.last_mulakhat_date)}</span>
+                ) : (
+                  <span className="text-slate-400 dark:text-slate-500 italic">Not Provided</span>
+                )}
               </div>
             </div>
-          )}
+          </div>
+        </div>
 
-          {/* Section 4: System Information */}
-          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4">
-            <div className="border-b border-slate-100 pb-3">
-              <h2 className="text-sm font-bold text-slate-800 flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-600" />
+          {/* Section 5: System Information */}
+          <div className="bg-white dark:bg-slate-900 p-5 sm:p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-4">
+            <div className="border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                <Clock className="w-4 h-4 text-slate-600 dark:text-slate-400" />
                 Record History
               </h2>
             </div>
 
             <div className="space-y-3 text-xs">
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Created Date</span>
-                <span className="text-slate-800 font-mono">
+              <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Created Date</span>
+                <span className="text-slate-800 dark:text-slate-200 font-mono">
                   {new Date(student.created_at).toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Last Modified Date</span>
-                <span className="text-slate-800 font-mono">
+              <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Last Modified Date</span>
+                <span className="text-slate-800 dark:text-slate-200 font-mono">
                   {new Date(student.updated_at).toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between py-1 border-b border-slate-50">
-                <span className="text-slate-500 font-medium">Created By</span>
-                <span className="text-slate-800 font-medium">{student.created_by || 'admin'}</span>
+              <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-800/60">
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Created By</span>
+                <span className="text-slate-800 dark:text-slate-200 font-medium">{student.created_by || 'admin'}</span>
               </div>
               <div className="flex justify-between py-1">
-                <span className="text-slate-500 font-medium">Last Modified By</span>
-                <span className="text-slate-800 font-medium">{student.updated_by || 'admin'}</span>
+                <span className="text-slate-500 dark:text-slate-400 font-medium">Last Modified By</span>
+                <span className="text-slate-800 dark:text-slate-200 font-medium">{student.updated_by || 'admin'}</span>
               </div>
             </div>
           </div>
-        </div>
 
         {/* Delete Modal */}
         {showDeleteModal && (

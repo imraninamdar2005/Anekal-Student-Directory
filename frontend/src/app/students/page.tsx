@@ -159,6 +159,59 @@ export default function StudentsListPage() {
     filterStatus !== 'All',
   ].filter(Boolean).length;
 
+  // Helpers for Currently Studying and Passout Milestones
+  const formatCurrentlyStudying = (st: any) => {
+    if (st.current_status === 'Passed Out') {
+      return `Passed Out (${st.class_or_standard || st.course_degree || 'Completed'})`;
+    }
+    if (st.education_type === 'School') {
+      return st.class_or_standard || 'School';
+    }
+    const deg = st.course_degree || 'Degree';
+    const branch = st.branch_specialization ? ` ${st.branch_specialization}` : '';
+    const yr = st.current_year_sem ? ` — ${st.current_year_sem}` : '';
+    return `${deg}${branch}${yr}`;
+  };
+
+  const formatPassoutMilestones = (st: any) => {
+    if (st.education_history) return st.education_history;
+    const parts: string[] = [];
+    if (st.passout_school_year) parts.push(`${st.passout_school_year} (10th)`);
+    if (st.passout_college_year) parts.push(`${st.passout_college_year} (College)`);
+    if (parts.length === 0 && st.passout_year) {
+      if (st.education_type === 'School') {
+        parts.push(`${st.passout_year} (10th)`);
+      } else {
+        parts.push(`${st.passout_year} (College)`);
+      }
+    }
+    return parts.join(' • ') || '—';
+  };
+
+  const formatMulakhatDate = (dateStr?: string | null) => {
+    if (!dateStr || dateStr.trim() === '' || dateStr === 'Not Provided') {
+      return 'Not Provided';
+    }
+    try {
+      const clean = dateStr.split('T')[0];
+      const parts = clean.split('-');
+      if (parts.length === 3) {
+        const [y, m, d] = parts.map(Number);
+        const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sept', 'Oct', 'Nov', 'Dec'];
+        if (m >= 1 && m <= 12 && d >= 1 && d <= 31) {
+          return `${d} ${monthNames[m - 1]} ${y}`;
+        }
+      }
+      const dt = new Date(dateStr);
+      if (!isNaN(dt.getTime())) {
+        return dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      }
+      return dateStr;
+    } catch {
+      return dateStr;
+    }
+  };
+
   // Direct export of current results (client-side formatted based on currently viewed query)
   const handleExportFiltered = (exportFormat: 'xlsx' | 'csv') => {
     setShowExportMenu(false);
@@ -167,18 +220,31 @@ export default function StudentsListPage() {
       'Sl No': idx + 1,
       'Student ID': st.student_id,
       'Student Name': st.full_name,
+      'Father Name': st.father_name || (st.parent_guardian_relation === 'Father' ? st.parent_guardian_name : ''),
+      'Father Contact': st.father_contact || '',
+      'Mother Name': st.mother_name || (st.parent_guardian_relation === 'Mother' ? st.parent_guardian_name : ''),
+      'Mother Contact': st.mother_contact || '',
+      'Guardian Name': st.guardian_name || (st.parent_guardian_relation === 'Guardian' ? st.parent_guardian_name : ''),
+      'Guardian Contact': st.guardian_contact || '',
       'Parent / Guardian Relation': st.parent_guardian_relation || 'Father',
       'Parent / Guardian Name': st.parent_guardian_name || '',
       'Contact Number': st.contact_number || '',
       'Second Number': st.second_number || '',
       'Second Number Relation': st.second_number_relation || 'Parent',
+      'School': st.school_name || '',
+      'College / University': st.college_name || (st.education_type === 'School' || !st.college_id ? 'Not joined yet' : ''),
       'School / College': st.school_name || st.college_name || '',
       'Education Type': st.education_type || '',
+      'Currently Studying': formatCurrentlyStudying(st),
       'Class / Course': st.class_or_standard || st.course_degree || '',
       'Branch': st.branch_specialization || '',
       'Academic Year': st.academic_year || '',
       'Passout Year': st.passout_year || '',
+      'Passout Year / Education History': formatPassoutMilestones(st),
       'Area': st.area_name || '',
+      'Masjid': st.masjid || st.near_masjid || 'Not Provided',
+      'Time Spent in Jamaat': st.time_spent_in_jamaat || st.time_in_jamaat || 'Not Provided',
+      'Last Mulakhat Date': formatMulakhatDate(st.last_mulakhat_date),
       'Address': st.address || '',
       'Status': st.current_status || '',
       'Profession': st.profession || '',
@@ -327,25 +393,29 @@ export default function StudentsListPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-xs">
               <thead>
-                <tr className="bg-slate-50/80 border-b border-slate-200 text-[11px] font-bold text-slate-600 uppercase tracking-wider">
+                <tr className="bg-slate-50/80 dark:bg-slate-800/80 border-b border-slate-200 dark:border-slate-700 text-[11px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider whitespace-nowrap">
                   <th className="py-3.5 px-3.5">Student ID</th>
                   <th className="py-3.5 px-3.5">Student Name</th>
                   <th className="py-3.5 px-3.5">Father / Mother / Guardian</th>
-                  <th className="py-3.5 px-3.5">Contact Number</th>
-                  <th className="py-3.5 px-3.5">School / College</th>
-                  <th className="py-3.5 px-3.5">Class / Course</th>
+                  <th className="py-3.5 px-3.5">Contact Information</th>
+                  <th className="py-3.5 px-3.5">School</th>
+                  <th className="py-3.5 px-3.5">College / University</th>
+                  <th className="py-3.5 px-3.5">Currently Studying</th>
                   <th className="py-3.5 px-3.5">Academic Year</th>
-                  <th className="py-3.5 px-3.5">Passout Year</th>
+                  <th className="py-3.5 px-3.5">Passout Year / Education History</th>
                   <th className="py-3.5 px-3.5">Area</th>
+                  <th className="py-3.5 px-3.5">Masjid</th>
+                  <th className="py-3.5 px-3.5">Time Spent in Jamaat</th>
+                  <th className="py-3.5 px-3.5">Last Mulakhat Date</th>
                   <th className="py-3.5 px-3.5">Status</th>
                   <th className="py-3.5 px-3.5">Last Modified</th>
-                  <th className="py-3.5 px-3.5 text-right">Actions</th>
+                  <th className="py-3.5 px-3.5 text-right sticky right-0 bg-slate-50 dark:bg-slate-800 z-10 shadow-sm">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100">
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {loading ? (
                   <tr>
-                    <td colSpan={12} className="py-12 text-center text-slate-400">
+                    <td colSpan={16} className="py-12 text-center text-slate-400">
                       <div className="flex flex-col items-center gap-2">
                         <div className="w-6 h-6 border-2 border-sky-600 border-t-transparent rounded-full animate-spin"></div>
                         <span>Loading students...</span>
@@ -354,57 +424,116 @@ export default function StudentsListPage() {
                   </tr>
                 ) : students.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-12 text-center text-slate-400">
-                      <p className="font-semibold text-slate-600">No students matched your search criteria.</p>
+                    <td colSpan={16} className="py-12 text-center text-slate-400">
+                      <p className="font-semibold text-slate-600 dark:text-slate-300">No students matched your search criteria.</p>
                       <p className="text-[11px] mt-1">Try resetting filters or searching with a different name.</p>
                     </td>
                   </tr>
                 ) : (
                   students.map((st) => (
-                    <tr key={st.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 px-3.5 font-mono font-medium text-slate-700">
+                    <tr key={st.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/50 transition-colors group">
+                      <td className="py-3 px-3.5 font-mono font-medium text-slate-700 dark:text-slate-300 whitespace-nowrap">
                         {st.student_id}
                       </td>
-                      <td className="py-3 px-3.5 font-bold text-slate-800">
+                      <td className="py-3 px-3.5 font-bold text-slate-800 dark:text-slate-100 whitespace-nowrap">
                         <Link
                           href={`/students/${st.id}`}
-                          className="hover:text-sky-600"
+                          className="hover:text-sky-600 dark:hover:text-sky-400"
                         >
                           {st.full_name}
                         </Link>
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600">
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         {st.parent_guardian_name ? (
-                          <span>
-                            {st.parent_guardian_name}
-                            <span className="text-slate-400 text-[10px] block">
+                          <div>
+                            <span className="font-semibold text-slate-800 dark:text-slate-200">
+                              {st.parent_guardian_name}
+                            </span>
+                            <span className="text-slate-400 dark:text-slate-500 text-[10.5px] block font-normal">
                               ({st.parent_guardian_relation || 'Parent'})
                             </span>
-                          </span>
+                          </div>
                         ) : (
                           '—'
                         )}
                       </td>
-                      <td className="py-3 px-3.5 font-mono text-slate-600">
-                        {st.contact_number || '—'}
+                      <td className="py-3 px-3.5 text-slate-700 dark:text-slate-300 whitespace-nowrap">
+                        <div className="space-y-1 font-mono text-[11.5px]">
+                          {st.contact_number && (
+                            <div className="flex items-center gap-1.5 leading-tight">
+                              <span className="text-slate-400 dark:text-slate-500 font-sans font-medium text-[10.5px]">Personal:</span>
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">{st.contact_number}</span>
+                            </div>
+                          )}
+                          {st.father_contact && (
+                            <div className="flex items-center gap-1.5 leading-tight">
+                              <span className="text-slate-400 dark:text-slate-500 font-sans font-medium text-[10.5px]">Father:</span>
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">{st.father_contact}</span>
+                            </div>
+                          )}
+                          {st.mother_contact && (
+                            <div className="flex items-center gap-1.5 leading-tight">
+                              <span className="text-slate-400 dark:text-slate-500 font-sans font-medium text-[10.5px]">Mother:</span>
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">{st.mother_contact}</span>
+                            </div>
+                          )}
+                          {st.guardian_contact && (
+                            <div className="flex items-center gap-1.5 leading-tight">
+                              <span className="text-slate-400 dark:text-slate-500 font-sans font-medium text-[10.5px]">Guardian:</span>
+                              <span className="font-semibold text-slate-800 dark:text-slate-200">{st.guardian_contact}</span>
+                            </div>
+                          )}
+                          {!st.contact_number && !st.father_contact && !st.mother_contact && !st.guardian_contact && (
+                            <span className="text-slate-400 dark:text-slate-500 italic font-sans text-xs">No contact</span>
+                          )}
+                        </div>
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600 max-w-[150px] truncate" title={st.school_name || st.college_name || 'Individual'}>
-                        {st.school_name || st.college_name || '—'}
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 max-w-[170px] truncate" title={st.school_name || '—'}>
+                        {st.school_name || '—'}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600">
-                        <div>{st.class_or_standard ? `${st.class_or_standard}` : (st.course_degree || '—')}</div>
-                        {st.branch_specialization && <div className="text-[10px] text-slate-400">{st.branch_specialization}</div>}
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 max-w-[170px] truncate" title={st.college_name || (st.education_type === 'School' || !st.college_id ? 'Not joined yet' : '—')}>
+                        {st.college_name ? (
+                          <span>{st.college_name}</span>
+                        ) : st.education_type === 'School' || !st.college_id ? (
+                          <span className="text-slate-400 dark:text-slate-500 italic">Not joined yet</span>
+                        ) : (
+                          '—'
+                        )}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600 font-medium">
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        <div>{formatCurrentlyStudying(st)}</div>
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
                         {st.academic_year || '—'}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600 font-medium">
-                        {st.passout_year || '—'}
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 font-medium whitespace-nowrap">
+                        {formatPassoutMilestones(st)}
                       </td>
-                      <td className="py-3 px-3.5 text-slate-600">
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
                         {st.area_name || '—'}
                       </td>
-                      <td className="py-3 px-3.5">
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {st.masjid && st.masjid !== 'Not Provided' ? (
+                          <span>{st.masjid}</span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 italic">Not Provided</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {st.time_spent_in_jamaat && st.time_spent_in_jamaat !== 'Not Provided' ? (
+                          <span>{st.time_spent_in_jamaat}</span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 italic">Not Provided</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 text-slate-600 dark:text-slate-300 whitespace-nowrap">
+                        {st.last_mulakhat_date && st.last_mulakhat_date !== 'Not Provided' ? (
+                          <span>{formatMulakhatDate(st.last_mulakhat_date)}</span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-slate-500 italic">Not Provided</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 whitespace-nowrap">
                         <Badge
                           variant={
                             st.current_status === 'Passed Out' ? 'success' : 'info'
@@ -413,14 +542,14 @@ export default function StudentsListPage() {
                           {st.current_status}
                         </Badge>
                       </td>
-                      <td className="py-3 px-3.5 text-slate-400 text-[11px]">
+                      <td className="py-3 px-3.5 text-slate-400 dark:text-slate-500 text-[11px] whitespace-nowrap">
                         {formatDate(st.updated_at || st.created_at)}
                       </td>
-                      <td className="py-3 px-3.5 text-right">
+                      <td className="py-3 px-3.5 text-right sticky right-0 bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800/80 z-10 shadow-sm whitespace-nowrap">
                         <div className="flex items-center justify-end gap-1.5">
                           <Link
                             href={`/students/${st.id}`}
-                            className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 rounded-lg transition-colors"
+                            className="p-1.5 text-slate-500 hover:text-sky-600 hover:bg-sky-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                             title="View Student"
                           >
                             <Eye className="w-3.5 h-3.5" />
@@ -428,7 +557,7 @@ export default function StudentsListPage() {
                           {canEdit && (
                             <Link
                               href={`/students/${st.id}/edit`}
-                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors"
+                              className="p-1.5 text-slate-500 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-slate-800 rounded-lg transition-colors"
                               title="Edit Student"
                             >
                               <Edit className="w-3.5 h-3.5" />

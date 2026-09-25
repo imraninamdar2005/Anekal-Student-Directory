@@ -29,16 +29,25 @@ export default function AddStudentWizardPage() {
   const [formData, setFormData] = useState({
     // Step 1: Basic & Contacts
     full_name: '',
+    whose_name_relation: 'Father', // 'Father', 'Mother', 'Guardian'
+    whose_name: '',
     parent_guardian_relation: 'Father',
     parent_guardian_name: '',
+    father_name: '',
+    father_contact: '',
+    mother_name: '',
+    mother_contact: '',
+    guardian_name: '',
+    guardian_contact: '',
     contact_number: '',
+    whose_number_relation: 'Father', // 'Father', 'Mother', 'Guardian', 'Self'
     second_number: '',
-    second_number_relation: 'Parent',
+    second_number_relation: 'Father',
 
     // Step 2: Study type
     education_type: 'School', // 'School' or 'College / University'
 
-    // Step 3: Education Details (Conditional)
+    // Step 3: Education Details (School & College Separate)
     school_id: '',
     class_or_standard: '10th',
     
@@ -49,11 +58,18 @@ export default function AddStudentWizardPage() {
 
     academic_year: '2026-27',
     passout_year: 2027,
+    passout_school_year: '',
+    passout_college_year: '',
+    education_history: '',
+    currently_studying: '',
 
     // Step 4: Location & Status
     area_id: '',
     address: '',
+    masjid: '',
     near_masjid: '',
+    time_spent_in_jamaat: '',
+    last_mulakhat_date: '',
     current_status: 'Currently Studying', // 'Currently Studying', 'Passed Out', 'Other'
     profession: '',
   });
@@ -104,9 +120,6 @@ export default function AddStudentWizardPage() {
       if (resSchools.data.length > 0 && !formData.school_id) {
         setFormData((prev) => ({ ...prev, school_id: String(resSchools.data[0].id) }));
       }
-      if (resColleges.data.length > 0 && !formData.college_id) {
-        setFormData((prev) => ({ ...prev, college_id: String(resColleges.data[0].id) }));
-      }
       if (resAreas.data.length > 0 && !formData.area_id) {
         setFormData((prev) => ({ ...prev, area_id: String(resAreas.data[0].id) }));
       }
@@ -129,12 +142,22 @@ export default function AddStudentWizardPage() {
 
     if (formData.education_type === 'School') {
       if (formData.class_or_standard === '10th') {
-        setFormData((prev) => ({ ...prev, passout_year: startYear + 1 }));
+        setFormData((prev) => ({
+          ...prev,
+          passout_year: startYear + 1,
+          passout_school_year: String(startYear + 1),
+          currently_studying: '10th Standard',
+        }));
       } else {
         const clsNum = parseInt(formData.class_or_standard.replace(/\D/g, ''), 10);
         if (!isNaN(clsNum) && clsNum >= 1 && clsNum <= 9) {
           const yearsRemaining = 10 - clsNum;
-          setFormData((prev) => ({ ...prev, passout_year: startYear + 1 + yearsRemaining }));
+          setFormData((prev) => ({
+            ...prev,
+            passout_year: startYear + 1 + yearsRemaining,
+            passout_school_year: String(startYear + 1 + yearsRemaining),
+            currently_studying: `${formData.class_or_standard} Standard`,
+          }));
         }
       }
     } else if (formData.education_type === 'College / University') {
@@ -145,9 +168,16 @@ export default function AddStudentWizardPage() {
         '4th Year': 0,
       };
       const rem = yearMap[formData.current_year_sem] ?? 1;
-      setFormData((prev) => ({ ...prev, passout_year: startYear + 1 + rem }));
+      const expectedCollegeYear = startYear + 1 + rem;
+      const collegeLabel = `${formData.course_degree}${formData.branch_specialization ? ` (${formData.branch_specialization})` : ''} — ${formData.current_year_sem}`;
+      setFormData((prev) => ({
+        ...prev,
+        passout_year: expectedCollegeYear,
+        passout_college_year: String(expectedCollegeYear),
+        currently_studying: collegeLabel,
+      }));
     }
-  }, [formData.education_type, formData.class_or_standard, formData.current_year_sem, formData.academic_year]);
+  }, [formData.education_type, formData.class_or_standard, formData.course_degree, formData.branch_specialization, formData.current_year_sem, formData.academic_year]);
 
   // Duplicate check on moving to Review
   const runDuplicateCheck = async () => {
@@ -156,8 +186,8 @@ export default function AddStudentWizardPage() {
       const res = await api.post('/api/students/check-duplicate', {
         full_name: formData.full_name,
         contact_number: formData.contact_number,
-        school_id: formData.education_type === 'School' ? Number(formData.school_id) : null,
-        college_id: formData.education_type === 'College / University' ? Number(formData.college_id) : null,
+        school_id: formData.school_id ? Number(formData.school_id) : null,
+        college_id: (formData.college_id && formData.college_id !== 'none') ? Number(formData.college_id) : null,
         academic_year: formData.academic_year,
       });
       if (res.data.is_duplicate) {
@@ -178,8 +208,21 @@ export default function AddStudentWizardPage() {
         return;
       }
       if (!formData.contact_number.trim()) {
-        setError('Please enter a valid Contact Number.');
+        setError('Please enter a valid Personal Contact Number.');
         return;
+      }
+    }
+    if (step === 3) {
+      if (formData.education_type === 'School') {
+        if (!formData.school_id) {
+          setError('Please select a School.');
+          return;
+        }
+      } else if (formData.education_type === 'College / University') {
+        if (!formData.college_id || formData.college_id === 'none') {
+          setError('Please select a College / University.');
+          return;
+        }
       }
     }
     if (step === 4) {
@@ -197,32 +240,77 @@ export default function AddStudentWizardPage() {
     setSubmitting(true);
     setError(null);
     try {
+      const isPassedOut = formData.current_status === 'Passed Out';
+      const mVal = formData.masjid.trim() || formData.near_masjid.trim() || null;
+      const jVal = formData.time_spent_in_jamaat?.trim() || null;
+
+      const isSchool = formData.education_type === 'School';
+
+      const whoseNameRel = formData.whose_name_relation || 'Father';
+      const whoseNameVal = formData.whose_name.trim() || null;
+      
+      const whoseNumRel = formData.whose_number_relation || 'Father';
+      const whoseNumVal = formData.second_number.trim() || null;
+
+      let fName = null;
+      let mName = null;
+      let gName = null;
+      if (whoseNameVal) {
+        if (whoseNameRel === 'Father') fName = whoseNameVal;
+        else if (whoseNameRel === 'Mother') mName = whoseNameVal;
+        else if (whoseNameRel === 'Guardian') gName = whoseNameVal;
+      }
+
+      let fContact = null;
+      let mContact = null;
+      let gContact = null;
+      if (whoseNumVal) {
+        if (whoseNumRel === 'Father') fContact = whoseNumVal;
+        else if (whoseNumRel === 'Mother') mContact = whoseNumVal;
+        else if (whoseNumRel === 'Guardian') gContact = whoseNumVal;
+      }
+
       const payload: any = {
         full_name: formData.full_name.trim(),
-        parent_guardian_relation: formData.parent_guardian_relation || 'Father',
-        parent_guardian_name: formData.parent_guardian_name.trim() || null,
+        parent_guardian_relation: whoseNameVal ? whoseNameRel : 'Father',
+        parent_guardian_name: whoseNameVal,
+        father_name: fName,
+        father_contact: fContact,
+        mother_name: mName,
+        mother_contact: mContact,
+        guardian_name: gName,
+        guardian_contact: gContact,
         contact_number: formData.contact_number.trim(),
-        second_number: formData.second_number.trim() || null,
-        second_number_relation: formData.second_number.trim() ? formData.second_number_relation : 'Parent',
+        second_number: whoseNumVal,
+        second_number_relation: whoseNumVal ? (whoseNumRel === 'Self' ? 'Self / Personal' : whoseNumRel) : 'Father',
+        
         education_type: formData.education_type,
-        academic_year: formData.academic_year,
-        passout_year: formData.passout_year ? Number(formData.passout_year) : null,
+        school_id: formData.school_id ? Number(formData.school_id) : null,
+        college_id: (!isSchool && formData.college_id && formData.college_id !== 'none') ? Number(formData.college_id) : null,
+        
+        class_or_standard: isSchool ? (formData.class_or_standard || null) : null,
+        course_degree: !isSchool ? (formData.course_degree || null) : null,
+        branch_specialization: !isSchool ? (formData.branch_specialization.trim() || null) : null,
+        current_year_sem: !isSchool ? (isPassedOut ? 'Passed Out' : (formData.current_year_sem || null)) : null,
+        
+        academic_year: formData.academic_year || null,
+        passout_year: isSchool
+          ? (formData.passout_school_year ? Number(formData.passout_school_year) : (formData.passout_year ? Number(formData.passout_year) : null))
+          : (formData.passout_college_year ? Number(formData.passout_college_year) : (formData.passout_year ? Number(formData.passout_year) : null)),
+        passout_school_year: formData.passout_school_year ? Number(formData.passout_school_year) : null,
+        passout_college_year: !isSchool && formData.passout_college_year ? Number(formData.passout_college_year) : null,
+        education_history: formData.education_history.trim() || null,
+        
         area_id: formData.area_id ? Number(formData.area_id) : null,
         address: formData.address.trim() || null,
-        near_masjid: formData.near_masjid.trim() || null,
+        masjid: mVal,
+        near_masjid: mVal,
+        time_spent_in_jamaat: jVal,
+        time_in_jamaat: jVal,
+        last_mulakhat_date: formData.last_mulakhat_date ? formData.last_mulakhat_date : null,
         current_status: formData.current_status,
-        profession: formData.current_status === 'Passed Out' ? (formData.profession.trim() || null) : null,
+        profession: isPassedOut ? (formData.profession.trim() || null) : null,
       };
-
-      if (formData.education_type === 'School') {
-        payload.school_id = formData.school_id ? Number(formData.school_id) : null;
-        payload.class_or_standard = formData.class_or_standard;
-      } else {
-        payload.college_id = formData.college_id ? Number(formData.college_id) : null;
-        payload.course_degree = formData.course_degree;
-        payload.branch_specialization = formData.branch_specialization.trim() || null;
-        payload.current_year_sem = formData.current_year_sem;
-      }
 
       await api.post('/api/students', payload);
       router.push('/students');
@@ -315,35 +403,37 @@ export default function AddStudentWizardPage() {
     <AppShell>
       <div className="max-w-3xl mx-auto space-y-6">
         {/* Header */}
-        <div className="flex items-center justify-between bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm">
+        <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-6 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
           <div className="flex items-center gap-3">
             <Link
               href="/students"
-              className="p-2 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl transition-colors text-slate-600"
+              className="p-2 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700/80 border border-slate-200 dark:border-slate-700 rounded-xl transition-colors text-slate-600 dark:text-slate-300"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold text-slate-800 tracking-tight">
+              <h1 className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 tracking-tight">
                 Add Student
               </h1>
-              <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
-                Step-by-step smart registration form
+              <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-0.5">
+                Step-by-step registration with separate contact numbers &amp; education history
               </p>
             </div>
           </div>
         </div>
 
         {/* Wizard Progress Bar */}
-        <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-sm">
-          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 mb-2 px-1">
-            <span className={step >= 1 ? 'text-sky-600 font-bold' : ''}>1. Basic Info</span>
+        <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center justify-between text-xs font-semibold text-slate-600 dark:text-slate-400 mb-2 px-1">
+            <span className={step >= 1 ? 'text-sky-600 font-bold' : ''}>1. Basic &amp; Contacts</span>
             <span className={step >= 2 ? 'text-sky-600 font-bold' : ''}>2. Education Type</span>
-            <span className={step >= 3 ? 'text-sky-600 font-bold' : ''}>3. Details</span>
-            <span className={step >= 4 ? 'text-sky-600 font-bold' : ''}>4. Location &amp; Status</span>
+            <span className={step >= 3 ? 'text-sky-600 font-bold' : ''}>
+              3. {formData.education_type === 'School' ? 'School Info' : 'Education Info'}
+            </span>
+            <span className={step >= 4 ? 'text-sky-600 font-bold' : ''}>4. Location &amp; Jamaat</span>
             <span className={step >= 5 ? 'text-sky-600 font-bold' : ''}>5. Review</span>
           </div>
-          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+          <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2 overflow-hidden">
             <div
               className="bg-sky-600 h-2 transition-all duration-300 rounded-full"
               style={{ width: `${(step / 5) * 100}%` }}
@@ -353,23 +443,23 @@ export default function AddStudentWizardPage() {
 
         {/* Error Alert */}
         {error && (
-          <div className="p-4 bg-rose-50 border border-rose-200 rounded-2xl text-xs text-rose-800 flex items-center gap-2">
+          <div className="p-4 bg-rose-50 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/40 rounded-2xl text-xs text-rose-800 dark:text-rose-300 flex items-center gap-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 flex-shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
         {/* Step Container */}
-        <div className="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200/80 shadow-sm">
-          {/* STEP 1: Basic Information */}
+        <div className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-2xl border border-slate-200/80 dark:border-slate-800 shadow-sm">
+          {/* STEP 1: Basic Information & Contact */}
           {step === 1 && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
-                Step 1: Student &amp; Contact Information
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-2">
+                Step 1: Student Information &amp; Contact
               </h2>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Student Name *
                 </label>
                 <input
@@ -378,40 +468,14 @@ export default function AddStudentWizardPage() {
                   placeholder="e.g. Ahmed Khan"
                   value={formData.full_name}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
 
-              {/* Parent / Guardian (Single Compact Row: [Relation Dropdown] [Name Input]) */}
+              {/* Personal Contact Number */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Parent / Guardian Details
-                </label>
-                <div className="flex gap-2">
-                  <select
-                    value={formData.parent_guardian_relation}
-                    onChange={(e) => setFormData({ ...formData, parent_guardian_relation: e.target.value })}
-                    className="w-36 text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium text-slate-800"
-                  >
-                    <option value="Father">Father</option>
-                    <option value="Mother">Mother</option>
-                    <option value="Guardian">Guardian</option>
-                    <option value="Other">Other</option>
-                  </select>
-                  <input
-                    type="text"
-                    placeholder="Enter parent / guardian name"
-                    value={formData.parent_guardian_name}
-                    onChange={(e) => setFormData({ ...formData, parent_guardian_name: e.target.value })}
-                    className="flex-1 text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
-                  />
-                </div>
-              </div>
-
-              {/* Contact Number */}
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Contact Number *
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Personal Contact Number *
                 </label>
                 <input
                   type="tel"
@@ -419,37 +483,69 @@ export default function AddStudentWizardPage() {
                   placeholder="10-digit mobile number"
                   value={formData.contact_number}
                   onChange={(e) => setFormData({ ...formData, contact_number: e.target.value })}
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono"
                 />
               </div>
 
-              {/* Second Number (Optional) with simple "Whose number is this?" options */}
+              {/* Whose Name? & Name Row */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Whose number?
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Whose Name?
                   </label>
                   <select
-                    value={formData.second_number_relation}
-                    onChange={(e) => setFormData({ ...formData, second_number_relation: e.target.value })}
-                    className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    value={formData.whose_name_relation}
+                    onChange={(e) => setFormData({ ...formData, whose_name_relation: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-200"
                   >
-                    <option value="Parent">Parent</option>
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
                     <option value="Guardian">Guardian</option>
-                    <option value="Self / Personal">Self / Personal</option>
                   </select>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-xs font-semibold text-slate-700 mb-1">
-                    Second Number (Optional)
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Enter name"
+                    value={formData.whose_name}
+                    onChange={(e) => setFormData({ ...formData, whose_name: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl text-slate-800 dark:text-slate-200"
+                  />
+                </div>
+              </div>
+
+              {/* Whose Number? & Number Row */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Whose Number?
+                  </label>
+                  <select
+                    value={formData.whose_number_relation}
+                    onChange={(e) => setFormData({ ...formData, whose_number_relation: e.target.value, second_number_relation: e.target.value })}
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-medium text-slate-800 dark:text-slate-200"
+                  >
+                    <option value="Father">Father</option>
+                    <option value="Mother">Mother</option>
+                    <option value="Guardian">Guardian</option>
+                    <option value="Self">Self</option>
+                  </select>
+                </div>
+
+                <div className="sm:col-span-2">
+                  <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                    Number
                   </label>
                   <input
                     type="tel"
-                    placeholder="Additional phone number"
+                    placeholder="Phone number (optional)"
                     value={formData.second_number}
                     onChange={(e) => setFormData({ ...formData, second_number: e.target.value })}
-                    className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                    className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono text-slate-800 dark:text-slate-200"
                   />
                 </div>
               </div>
@@ -459,26 +555,36 @@ export default function AddStudentWizardPage() {
           {/* STEP 2: Study Type Selection */}
           {step === 2 && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
-                Step 2: What is the student studying?
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-2">
+                Step 2: Primary Education Type
               </h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, education_type: 'School' })}
+                  onClick={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      education_type: 'School',
+                      college_id: '',
+                      course_degree: '',
+                      branch_specialization: '',
+                      current_year_sem: '',
+                      passout_college_year: '',
+                    }));
+                  }}
                   className={`p-6 rounded-2xl border text-left flex flex-col items-start gap-3 transition-all ${
                     formData.education_type === 'School'
-                      ? 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20 text-amber-950'
-                      : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                      ? 'border-amber-500 bg-amber-50/70 dark:bg-amber-950/20 ring-2 ring-amber-500/20 text-amber-950 dark:text-amber-200'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <div className="p-3 bg-amber-100 rounded-xl text-amber-700">
+                  <div className="p-3 bg-amber-100 dark:bg-amber-900/40 rounded-xl text-amber-700 dark:text-amber-300">
                     <GraduationCap className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm">School</h3>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <h3 className="font-bold text-sm">School Student</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                       Primary, Middle, or High School (Class 1st to 10th standard).
                     </p>
                   </div>
@@ -486,20 +592,27 @@ export default function AddStudentWizardPage() {
 
                 <button
                   type="button"
-                  onClick={() => setFormData({ ...formData, education_type: 'College / University' })}
+                  onClick={() => {
+                    setFormData((prev) => ({
+                      ...prev,
+                      education_type: 'College / University',
+                      course_degree: prev.course_degree || 'BE',
+                      current_year_sem: prev.current_year_sem || '1st Year',
+                    }));
+                  }}
                   className={`p-6 rounded-2xl border text-left flex flex-col items-start gap-3 transition-all ${
                     formData.education_type === 'College / University'
-                      ? 'border-indigo-500 bg-indigo-50/70 ring-2 ring-indigo-500/20 text-indigo-950'
-                      : 'border-slate-200 bg-white hover:bg-slate-50 text-slate-700'
+                      ? 'border-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/20 ring-2 ring-indigo-500/20 text-indigo-950 dark:text-indigo-200'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 text-slate-700 dark:text-slate-300'
                   }`}
                 >
-                  <div className="p-3 bg-indigo-100 rounded-xl text-indigo-700">
+                  <div className="p-3 bg-indigo-100 dark:bg-indigo-900/40 rounded-xl text-indigo-700 dark:text-indigo-300">
                     <Building2 className="w-6 h-6" />
                   </div>
                   <div>
-                    <h3 className="font-bold text-sm">College / University</h3>
-                    <p className="text-xs text-slate-500 mt-1">
-                      Undergraduate, Diploma, Engineering, Medical, or Postgraduate.
+                    <h3 className="font-bold text-sm">College / University Student</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      PUC, Undergraduate, Diploma, Engineering, Medical, or Postgraduate.
                     </p>
                   </div>
                 </button>
@@ -507,33 +620,41 @@ export default function AddStudentWizardPage() {
             </div>
           )}
 
-          {/* STEP 3: Education Details (Conditional) */}
-          {step === 3 && (
-            <div className="space-y-4 animate-in fade-in duration-200">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
-                Step 3: {formData.education_type} Details
+          {/* STEP 3 CASE A: SCHOOL STUDENT (Current School Only) */}
+          {step === 3 && formData.education_type === 'School' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-2">
+                Step 3: School Information
               </h2>
 
-              {/* IF SCHOOL */}
-              {formData.education_type === 'School' ? (
-                <div className="space-y-4">
+              {/* Current School Section */}
+              <div className="p-4 bg-amber-50/40 dark:bg-amber-950/10 rounded-2xl border border-amber-200/70 dark:border-amber-900/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                    <GraduationCap className="w-4 h-4 text-amber-600" />
+                    <span>Current School</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSchoolModal(true)}
+                    className="text-xs text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add New School</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-slate-700">School *</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddSchoolModal(true)}
-                        className="text-xs text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add New School</span>
-                      </button>
-                    </div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      School Name *
+                    </label>
                     <select
                       value={formData.school_id}
                       onChange={(e) => setFormData({ ...formData, school_id: e.target.value })}
-                      className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
                     >
+                      <option value="">-- Select School --</option>
                       {schools.map((s) => (
                         <option key={s.id} value={s.id}>
                           {s.school_name} {s.locality ? `(${s.locality})` : ''}
@@ -542,72 +663,188 @@ export default function AddStudentWizardPage() {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Current Class
-                      </label>
-                      <select
-                        value={formData.class_or_standard}
-                        onChange={(e) => setFormData({ ...formData, class_or_standard: e.target.value })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      >
-                        {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', 'Other'].map((c) => (
-                          <option key={c} value={c}>{c}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Academic Year
-                      </label>
-                      <select
-                        value={formData.academic_year}
-                        onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
-                      >
-                        {academicYears.map((ay) => (
-                          <option key={ay.id} value={ay.year_label}>
-                            {ay.year_label} {ay.is_current ? '(Current)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Expected Passout Year
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.passout_year}
-                        onChange={(e) => setFormData({ ...formData, passout_year: parseInt(e.target.value) || 2027 })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 font-bold text-amber-900"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      School Class *
+                    </label>
+                    <select
+                      value={formData.class_or_standard}
+                      onChange={(e) => setFormData({ ...formData, class_or_standard: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      {['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th', 'Other'].map((c) => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
                   </div>
                 </div>
-              ) : (
-                /* IF COLLEGE / UNIVERSITY */
-                <div className="space-y-4">
+              </div>
+
+              {/* Current Studying & Passout Milestones (School) */}
+              <div className="p-4 bg-slate-50/80 dark:bg-slate-800/40 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3">
+                <span className="text-xs font-bold text-sky-800 dark:text-sky-300 block uppercase tracking-wide">
+                  Academic &amp; Passout Information
+                </span>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-semibold text-slate-700">College / University *</label>
-                      <button
-                        type="button"
-                        onClick={() => setShowAddCollegeModal(true)}
-                        className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1"
-                      >
-                        <Plus className="w-3.5 h-3.5" />
-                        <span>Add New College</span>
-                      </button>
-                    </div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Academic Year
+                    </label>
+                    <select
+                      value={formData.academic_year}
+                      onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
+                    >
+                      {academicYears.map((ay) => (
+                        <option key={ay.id} value={ay.year_label}>
+                          {ay.year_label} {ay.is_current ? '(Current)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Currently Studying (Display Label)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 10th Standard"
+                      value={formData.currently_studying}
+                      onChange={(e) => setFormData({ ...formData, currently_studying: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Passout Year / 10th Milestone
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 2026"
+                      value={formData.passout_school_year}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          passout_school_year: val,
+                          passout_year: Number(val) || prev.passout_year,
+                        }));
+                      }}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Education History / Notes
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2026 (10th Standard)"
+                      value={formData.education_history}
+                      onChange={(e) => setFormData({ ...formData, education_history: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* STEP 3 CASE B: COLLEGE / UNIVERSITY STUDENT (Previous School + Current College) */}
+          {step === 3 && formData.education_type === 'College / University' && (
+            <div className="space-y-5 animate-in fade-in duration-200">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-2">
+                Step 3: Education Information
+              </h2>
+
+              {/* 1. PREVIOUS SCHOOL INFORMATION */}
+              <div className="p-4 bg-amber-50/40 dark:bg-amber-950/10 rounded-2xl border border-amber-200/70 dark:border-amber-900/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
+                      <GraduationCap className="w-4 h-4 text-amber-600" />
+                      <span>Previous School Information</span>
+                    </h3>
+                    <p className="text-[11px] text-amber-800/80 dark:text-amber-400/80 mt-0.5">
+                      Which school did this student study in before joining college?
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSchoolModal(true)}
+                    className="text-xs text-amber-600 hover:text-amber-700 font-semibold flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add New School</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      School Previously Attended
+                    </label>
+                    <select
+                      value={formData.school_id}
+                      onChange={(e) => setFormData({ ...formData, school_id: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="">-- None / Not Applicable --</option>
+                      {schools.map((s) => (
+                        <option key={s.id} value={s.id}>
+                          {s.school_name} {s.locality ? `(${s.locality})` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      School Passout Year (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 2025"
+                      value={formData.passout_school_year}
+                      onChange={(e) => setFormData({ ...formData, passout_school_year: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. CURRENT COLLEGE / UNIVERSITY INFORMATION */}
+              <div className="p-4 bg-indigo-50/40 dark:bg-indigo-950/10 rounded-2xl border border-indigo-200/70 dark:border-indigo-900/30 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5 uppercase tracking-wide">
+                    <Building2 className="w-4 h-4 text-indigo-600" />
+                    <span>Current College / University Information</span>
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => setShowAddCollegeModal(true)}
+                    className="text-xs text-indigo-600 hover:text-indigo-700 font-semibold flex items-center gap-1"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>+ Add New College</span>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      College / University *
+                    </label>
                     <select
                       value={formData.college_id}
                       onChange={(e) => setFormData({ ...formData, college_id: e.target.value })}
-                      className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
                     >
+                      <option value="">-- Select College / University --</option>
                       {colleges.map((c) => (
                         <option key={c.id} value={c.id}>
                           {c.college_name} {c.locality ? `(${c.locality})` : ''}
@@ -616,97 +853,127 @@ export default function AddStudentWizardPage() {
                     </select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Course / Degree
-                      </label>
-                      <select
-                        value={formData.course_degree}
-                        onChange={(e) => setFormData({ ...formData, course_degree: e.target.value })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {['BE', 'BTech', 'BCA', 'BSc', 'BCom', 'BA', 'Diploma', 'MBA', 'MCA', 'Other'].map((d) => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                      </select>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Branch / Specialization (Optional)
-                      </label>
-                      <input
-                        type="text"
-                        placeholder="e.g. Computer Science, Mechanical"
-                        value={formData.branch_specialization}
-                        onChange={(e) => setFormData({ ...formData, branch_specialization: e.target.value })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Course / Degree
+                    </label>
+                    <select
+                      value={formData.course_degree}
+                      onChange={(e) => setFormData({ ...formData, course_degree: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                    >
+                      {['BE', 'BTech', 'BCA', 'BSc', 'BCom', 'BA', 'PUC', 'Diploma', 'MBA', 'MCA', 'Other'].map((d) => (
+                        <option key={d} value={d}>{d}</option>
+                      ))}
+                    </select>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Current Year / Semester
-                      </label>
-                      <select
-                        value={formData.current_year_sem}
-                        onChange={(e) => setFormData({ ...formData, current_year_sem: e.target.value })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {['1st Year', '2nd Year', '3rd Year', '4th Year', '1st Sem', '2nd Sem', '3rd Sem', '4th Sem', '5th Sem', '6th Sem', '7th Sem', '8th Sem'].map((y) => (
-                          <option key={y} value={y}>{y}</option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Branch / Specialization
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Computer Science, Commerce"
+                      value={formData.branch_specialization}
+                      onChange={(e) => setFormData({ ...formData, branch_specialization: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
+                    />
+                  </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Academic Year
-                      </label>
-                      <select
-                        value={formData.academic_year}
-                        onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                      >
-                        {academicYears.map((ay) => (
-                          <option key={ay.id} value={ay.year_label}>
-                            {ay.year_label} {ay.is_current ? '(Current)' : ''}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Current Year / Semester
+                    </label>
+                    <select
+                      value={formData.current_year_sem}
+                      onChange={(e) => setFormData({ ...formData, current_year_sem: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
+                    >
+                      {['1st Year', '2nd Year', '3rd Year', '4th Year', '1st Sem', '2nd Sem', '3rd Sem', '4th Sem', '5th Sem', '6th Sem', '7th Sem', '8th Sem'].map((y) => (
+                        <option key={y} value={y}>{y}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 mb-1">
-                        Expected Passout Year
-                      </label>
-                      <input
-                        type="number"
-                        value={formData.passout_year}
-                        onChange={(e) => setFormData({ ...formData, passout_year: parseInt(e.target.value) || 2028 })}
-                        className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 font-bold text-indigo-900"
-                      />
-                    </div>
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Academic Year
+                    </label>
+                    <select
+                      value={formData.academic_year}
+                      onChange={(e) => setFormData({ ...formData, academic_year: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
+                    >
+                      {academicYears.map((ay) => (
+                        <option key={ay.id} value={ay.year_label}>
+                          {ay.year_label} {ay.is_current ? '(Current)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Currently Studying (Display Label)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 3rd Year — B.E. CSE"
+                      value={formData.currently_studying}
+                      onChange={(e) => setFormData({ ...formData, currently_studying: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Expected College Passout Year
+                    </label>
+                    <input
+                      type="number"
+                      placeholder="e.g. 2028"
+                      value={formData.passout_college_year}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setFormData((prev) => ({
+                          ...prev,
+                          passout_college_year: val,
+                          passout_year: Number(val) || prev.passout_year,
+                        }));
+                      }}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                      Education History / Milestones
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 2025 (10th) • 2028 (College)"
+                      value={formData.education_history}
+                      onChange={(e) => setFormData({ ...formData, education_history: e.target.value })}
+                      className="w-full text-xs p-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl font-mono"
+                    />
                   </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
 
-          {/* STEP 4: Location & Status */}
+          {/* STEP 4: Location, Masjid & Status */}
           {step === 4 && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
-                Step 4: Location &amp; Status
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-2">
+                Step 4: Location, Masjid &amp; Status
               </h2>
 
               {/* Area */}
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-slate-700">Area</label>
+                  <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">Area</label>
                   <button
                     type="button"
                     onClick={() => setShowAddAreaModal(true)}
@@ -719,7 +986,7 @@ export default function AddStudentWizardPage() {
                 <select
                   value={formData.area_id}
                   onChange={(e) => setFormData({ ...formData, area_id: e.target.value })}
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
                 >
                   {areas.map((a) => (
                     <option key={a.id} value={a.id}>
@@ -731,7 +998,7 @@ export default function AddStudentWizardPage() {
 
               {/* Address (Optional) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Address (Optional)
                 </label>
                 <input
@@ -739,33 +1006,69 @@ export default function AddStudentWizardPage() {
                   placeholder="e.g. Near Main Market, Anekal"
                   value={formData.address}
                   onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
               </div>
 
-              {/* Near which Masjid? (Optional) */}
+              {/* Voluntary Masjid (Task 6) */}
               <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Near which Masjid? (Optional)
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Masjid (Voluntary / Optional)
                 </label>
                 <input
                   type="text"
-                  placeholder="Voluntarily provided (leave blank if not applicable)"
-                  value={formData.near_masjid}
-                  onChange={(e) => setFormData({ ...formData, near_masjid: e.target.value })}
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  placeholder="Voluntarily provided (leave blank for 'Not Provided')"
+                  value={formData.masjid}
+                  onChange={(e) => setFormData({ ...formData, masjid: e.target.value, near_masjid: e.target.value })}
+                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
                 />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Only entered when voluntarily provided. Never inferred or required.
+                </span>
+              </div>
+
+              {/* Time Spent in Jamaat (Voluntary / Optional) */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Time Spent in Jamaat (Voluntary / Optional)
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. 2 years, 6 months, since childhood"
+                  value={formData.time_spent_in_jamaat}
+                  onChange={(e) => setFormData({ ...formData, time_spent_in_jamaat: e.target.value })}
+                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-medium text-slate-800 dark:text-slate-200"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Voluntarily provided information. Protected by existing authorization.
+                </span>
+              </div>
+
+              {/* Last Mulakhat Date */}
+              <div>
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
+                  Last Mulakhat Date (Optional)
+                </label>
+                <input
+                  type="date"
+                  value={formData.last_mulakhat_date}
+                  onChange={(e) => setFormData({ ...formData, last_mulakhat_date: e.target.value })}
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500 font-mono text-slate-800 dark:text-slate-200"
+                />
+                <span className="text-[10px] text-slate-400 mt-1 block">
+                  Optional date of last mulakhat. Leave blank if not available (will show as &apos;Not Provided&apos;).
+                </span>
               </div>
 
               {/* Status */}
-              <div className="pt-2 border-t border-slate-100">
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
                   Status
                 </label>
                 <select
                   value={formData.current_status}
                   onChange={(e) => setFormData({ ...formData, current_status: e.target.value })}
-                  className="w-full text-xs p-3 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
+                  className="w-full text-xs p-3 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-sky-500"
                 >
                   <option value="Currently Studying">Currently Studying</option>
                   <option value="Passed Out">Passed Out</option>
@@ -775,9 +1078,9 @@ export default function AddStudentWizardPage() {
 
               {/* Current Profession (Shown ONLY if Passed Out) */}
               {formData.current_status === 'Passed Out' && (
-                <div className="p-4 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-3">
+                <div className="p-4 bg-emerald-50/70 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900/40 rounded-2xl space-y-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                    <h3 className="text-xs font-bold text-emerald-900 dark:text-emerald-300 flex items-center gap-1.5">
                       <Briefcase className="w-3.5 h-3.5 text-emerald-700" />
                       <span>Passed Out / Alumni Details</span>
                     </h3>
@@ -791,13 +1094,13 @@ export default function AddStudentWizardPage() {
                     </button>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-emerald-800 mb-1">
+                    <label className="block text-xs font-semibold text-emerald-800 dark:text-emerald-300 mb-1">
                       Current Profession / Occupation
                     </label>
                     <select
                       value={formData.profession}
                       onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
-                      className="w-full text-xs p-3 bg-white border border-emerald-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800"
+                      className="w-full text-xs p-3 bg-white dark:bg-slate-800 border border-emerald-200 dark:border-emerald-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 text-slate-800 dark:text-slate-200"
                     >
                       <option value="">-- Select Profession --</option>
                       {professions.map((p) => (
@@ -815,13 +1118,13 @@ export default function AddStudentWizardPage() {
           {/* STEP 5: Review & Save */}
           {step === 5 && (
             <div className="space-y-4 animate-in fade-in duration-200">
-              <h2 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-2">
+              <h2 className="text-sm font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider mb-2">
                 Step 5: Review &amp; Confirm
               </h2>
 
               {duplicateWarning && (
-                <div className="p-4 bg-amber-50 border border-amber-300 rounded-2xl space-y-2 text-xs text-amber-900">
-                  <div className="flex items-center gap-2 font-bold text-amber-800">
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/30 border border-amber-300 dark:border-amber-800 rounded-2xl space-y-2 text-xs text-amber-900 dark:text-amber-200">
+                  <div className="flex items-center gap-2 font-bold text-amber-800 dark:text-amber-300">
                     <AlertTriangle className="w-4 h-4 text-amber-600" />
                     <span>Possible Duplicate Record Detected</span>
                   </div>
@@ -834,102 +1137,138 @@ export default function AddStudentWizardPage() {
               )}
 
               {/* Review Summary Card */}
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 space-y-3 text-xs">
+              <div className="bg-slate-50 dark:bg-slate-800/60 p-5 rounded-2xl border border-slate-200 dark:border-slate-700 space-y-3 text-xs">
                 <div className="grid grid-cols-2 gap-2">
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Student Name</span>
-                    <strong className="text-slate-800 text-sm">{formData.full_name}</strong>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Student Name</span>
+                    <strong className="text-slate-800 dark:text-slate-100 text-sm">{formData.full_name}</strong>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Parent / Guardian</span>
-                    <span className="text-slate-700">
-                      {formData.parent_guardian_name ? `${formData.parent_guardian_name} (${formData.parent_guardian_relation})` : '—'}
-                    </span>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Personal Contact</span>
+                    <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">{formData.contact_number}</span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Contact Number</span>
-                    <span className="font-mono text-slate-800 font-semibold">{formData.contact_number}</span>
+                {(formData.whose_name || formData.second_number) && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700">
+                    {formData.whose_name && (
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Name ({formData.whose_name_relation})</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-semibold">{formData.whose_name}</span>
+                      </div>
+                    )}
+                    {formData.second_number && (
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Number ({formData.whose_number_relation})</span>
+                        <span className="font-mono text-slate-800 dark:text-slate-200 font-semibold">{formData.second_number}</span>
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Second Number</span>
-                    <span className="font-mono text-slate-700">
-                      {formData.second_number ? `${formData.second_number} (${formData.second_number_relation})` : 'None'}
-                    </span>
-                  </div>
-                </div>
+                )}
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Education Type</span>
+                {/* Conditional Education Review */}
+                <div className="pt-2 border-t border-slate-200/60 dark:border-slate-700 space-y-2">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Education Type:</span>
                     <Badge variant={formData.education_type === 'School' ? 'warning' : 'purple'}>
                       {formData.education_type}
                     </Badge>
                   </div>
+                  {formData.education_type === 'School' ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Current School</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                          {schools.find((s) => String(s.id) === String(formData.school_id))?.school_name || 'None'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">School Class</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                          {formData.class_or_standard}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Previous School</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                          {schools.find((s) => String(s.id) === String(formData.school_id))?.school_name || 'None'}
+                          {formData.passout_school_year ? ` (Passout: ${formData.passout_school_year})` : ''}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Current College / University</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                          {colleges.find((c) => String(c.id) === String(formData.college_id))?.college_name || 'Not selected'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">Course &amp; Year</span>
+                        <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                          {formData.course_degree}{formData.branch_specialization ? ` (${formData.branch_specialization})` : ''} — {formData.current_year_sem}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700">
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Institution</span>
-                    <span className="text-slate-800 font-semibold">
-                      {formData.education_type === 'School'
-                        ? schools.find((s) => String(s.id) === String(formData.school_id))?.school_name
-                        : colleges.find((c) => String(c.id) === String(formData.college_id))?.college_name}
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Currently Studying</span>
+                    <span className="text-slate-800 dark:text-slate-200 font-semibold">
+                      {formData.currently_studying || (formData.education_type === 'School' ? `${formData.class_or_standard} Standard` : `${formData.course_degree} - ${formData.current_year_sem}`)}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Education Milestones</span>
+                    <span className="text-slate-800 dark:text-slate-200 font-mono">
+                      {formData.education_history || [
+                        formData.passout_school_year ? `${formData.passout_school_year} (10th)` : null,
+                        formData.passout_college_year ? `${formData.passout_college_year} (College)` : null
+                      ].filter(Boolean).join(' • ') || `${formData.passout_year || '—'}`}
                     </span>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 pt-2 border-t border-slate-200/60 dark:border-slate-700">
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Class / Course</span>
-                    <span className="text-slate-800">
-                      {formData.education_type === 'School'
-                        ? `${formData.class_or_standard} Standard`
-                        : `${formData.course_degree} ${formData.branch_specialization ? `(${formData.branch_specialization})` : ''}`}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Academic / Passout Year</span>
-                    <span className="text-slate-800">
-                      {formData.academic_year} &bull; Passout {formData.passout_year}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-200/60">
-                  <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Area</span>
-                    <span className="text-slate-800">
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Area</span>
+                    <span className="text-slate-800 dark:text-slate-200">
                       {areas.find((a) => String(a.id) === String(formData.area_id))?.area_name || 'Anekal'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-slate-400 block text-[10px] uppercase">Status</span>
-                    <Badge variant={formData.current_status === 'Passed Out' ? 'success' : 'info'}>
-                      {formData.current_status}
-                    </Badge>
-                    {formData.profession && (
-                      <span className="block text-[11px] text-slate-500 mt-0.5">{formData.profession}</span>
-                    )}
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Masjid (Voluntary)</span>
+                    <span className="text-slate-800 dark:text-slate-200">
+                      {formData.masjid || formData.near_masjid || 'Not Provided'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Time Spent in Jamaat</span>
+                    <span className="text-slate-800 dark:text-slate-200">
+                      {formData.time_spent_in_jamaat || 'Not Provided'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 block text-[10px] uppercase font-semibold">Last Mulakhat Date</span>
+                    <span className="text-slate-800 dark:text-slate-200">
+                      {formData.last_mulakhat_date || 'Not Provided'}
+                    </span>
                   </div>
                 </div>
-
-                {formData.near_masjid && (
-                  <div className="pt-2 border-t border-slate-200/60">
-                    <span className="text-slate-400 block text-[10px] uppercase">Near which Masjid?</span>
-                    <span className="text-slate-700">{formData.near_masjid}</span>
-                  </div>
-                )}
               </div>
             </div>
           )}
 
           {/* Wizard Navigation Buttons */}
-          <div className="flex items-center justify-between pt-6 border-t border-slate-100 mt-6">
+          <div className="flex items-center justify-between pt-6 border-t border-slate-100 dark:border-slate-800 mt-6">
             {step > 1 ? (
               <button
                 type="button"
                 onClick={handleBack}
-                className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-xl flex items-center gap-1.5"
+                className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 rounded-xl flex items-center gap-1.5 transition-colors"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
@@ -942,7 +1281,7 @@ export default function AddStudentWizardPage() {
               <button
                 type="button"
                 onClick={handleNext}
-                className="px-6 py-2.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-md shadow-sky-600/20 flex items-center gap-1.5"
+                className="px-6 py-2.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-xl shadow-md shadow-sky-600/20 flex items-center gap-1.5 transition-colors"
               >
                 <span>Next</span>
                 <ArrowRight className="w-3.5 h-3.5" />
@@ -952,7 +1291,7 @@ export default function AddStudentWizardPage() {
                 type="button"
                 onClick={handleSubmit}
                 disabled={submitting}
-                className="px-7 py-2.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-1.5 disabled:opacity-50"
+                className="px-7 py-2.5 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 rounded-xl shadow-md shadow-emerald-600/20 flex items-center gap-1.5 disabled:opacity-50 transition-colors"
               >
                 <CheckCircle2 className="w-4 h-4" />
                 <span>{submitting ? 'Saving Student...' : 'Save Student'}</span>
@@ -964,8 +1303,8 @@ export default function AddStudentWizardPage() {
         {/* Quick Add School Modal */}
         {showAddSchoolModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <GraduationCap className="w-4 h-4 text-amber-600" />
                 Add New School
               </h3>
@@ -976,20 +1315,20 @@ export default function AddStudentWizardPage() {
                   placeholder="School Name"
                   value={newSchoolName}
                   onChange={(e) => setNewSchoolName(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                 />
                 <input
                   type="text"
                   placeholder="Locality / Area"
                   value={newSchoolLocality}
                   onChange={(e) => setNewSchoolLocality(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                 />
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAddSchoolModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl"
                   >
                     Cancel
                   </button>
@@ -1008,8 +1347,8 @@ export default function AddStudentWizardPage() {
         {/* Quick Add College Modal */}
         {showAddCollegeModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <Building2 className="w-4 h-4 text-indigo-600" />
                 Add New College
               </h3>
@@ -1020,20 +1359,20 @@ export default function AddStudentWizardPage() {
                   placeholder="College / University Name"
                   value={newCollegeName}
                   onChange={(e) => setNewCollegeName(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                 />
                 <input
                   type="text"
                   placeholder="Locality / Area"
                   value={newCollegeLocality}
                   onChange={(e) => setNewCollegeLocality(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                 />
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAddCollegeModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl"
                   >
                     Cancel
                   </button>
@@ -1052,8 +1391,8 @@ export default function AddStudentWizardPage() {
         {/* Quick Add Area Modal */}
         {showAddAreaModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-sky-600" />
                 Add New Area
               </h3>
@@ -1064,20 +1403,20 @@ export default function AddStudentWizardPage() {
                   placeholder="Area Name"
                   value={newAreaName}
                   onChange={(e) => setNewAreaName(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                 />
                 <input
                   type="text"
                   placeholder="Optional: nearby landmark, famous place, or other location detail."
                   value={newAreaDesc}
                   onChange={(e) => setNewAreaDesc(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl"
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl"
                 />
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAddAreaModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl"
                   >
                     Cancel
                   </button>
@@ -1096,8 +1435,8 @@ export default function AddStudentWizardPage() {
         {/* Quick Add Profession Modal */}
         {showAddProfessionModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4">
-            <div className="bg-white rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl">
-              <h3 className="font-bold text-sm text-slate-800 flex items-center gap-2">
+            <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl border border-slate-200 dark:border-slate-800">
+              <h3 className="font-bold text-sm text-slate-800 dark:text-slate-100 flex items-center gap-2">
                 <Briefcase className="w-4 h-4 text-emerald-600" />
                 Add New Profession
               </h3>
@@ -1108,13 +1447,13 @@ export default function AddStudentWizardPage() {
                   placeholder="e.g. Graphic Designer, Electrician, Pharmacist"
                   value={newProfessionName}
                   onChange={(e) => setNewProfessionName(e.target.value)}
-                  className="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full text-xs p-2.5 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500"
                 />
                 <div className="flex justify-end gap-2 pt-2">
                   <button
                     type="button"
                     onClick={() => setShowAddProfessionModal(false)}
-                    className="px-4 py-2 text-xs font-semibold text-slate-600 bg-slate-100 rounded-xl"
+                    className="px-4 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 rounded-xl"
                   >
                     Cancel
                   </button>

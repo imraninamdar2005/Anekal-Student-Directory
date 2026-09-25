@@ -17,6 +17,7 @@ interface AuthContextType {
   loading: boolean;
   login: (token: string, userData: User) => void;
   logout: () => void;
+  updateUser: (updatedData: Partial<User>) => void;
   canEdit: boolean;
   canAdmin: boolean;
   isViewer: boolean;
@@ -51,6 +52,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setUser(userData);
   };
 
+  const updateUser = (updatedData: Partial<User>) => {
+    setUser((prev) => {
+      if (!prev) return null;
+      const updated = { ...prev, ...updatedData };
+      localStorage.setItem('anekal_user', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   const logout = () => {
     localStorage.removeItem('anekal_token');
     localStorage.removeItem('anekal_user');
@@ -71,6 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         loading,
         login,
         logout,
+        updateUser,
         canEdit,
         canAdmin,
         isViewer,

@@ -61,14 +61,20 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
       >
         {/* Brand header */}
         <div className="p-5 border-b border-slate-800/90 flex items-start justify-between">
-          <Link href="/dashboard" className="flex items-start gap-3 group flex-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-sky-600/30 flex-shrink-0 mt-0.5 group-hover:scale-105 transition-all">
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <Link
+              href="/dashboard"
+              className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500 to-sky-700 flex items-center justify-center text-white font-extrabold text-lg shadow-lg shadow-sky-600/30 flex-shrink-0 mt-0.5 hover:scale-105 transition-all"
+              aria-label="Dashboard"
+            >
               A
-            </div>
+            </Link>
             <div className="flex-1 min-w-0">
-              <span className="font-extrabold text-white tracking-tight text-[15px] block leading-snug">
-                Anekal Student<br />Directory
-              </span>
+              <Link href="/dashboard" className="block group">
+                <span className="font-extrabold text-white tracking-tight text-[15px] block leading-snug group-hover:text-sky-300 transition-colors">
+                  Anekal Student<br />Directory
+                </span>
+              </Link>
               
               <div className="mt-2.5 pt-2 border-t border-slate-800/60">
                 <span className="text-[10.5px] text-slate-400 font-semibold tracking-wider uppercase block">
@@ -82,9 +88,22 @@ export default function Sidebar({ isOpen, onClose }: SidebarProps) {
                 </div>
                 {/* Subtle India Tricolor Accent Line */}
                 <div className="h-[2px] w-28 rounded-full bg-gradient-to-r from-amber-500 via-slate-200 to-emerald-500 mt-1 opacity-80" />
+
+                {/* LinkedIn Link */}
+                <div className="mt-1.5">
+                  <a
+                    href="https://www.linkedin.com/in/imran-inamdar-b49366352/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-400 hover:text-sky-300 hover:underline transition-colors group/link"
+                  >
+                    <span>View LinkedIn</span>
+                    <span className="text-[10px] transition-transform duration-150 group-hover/link:translate-x-0.5 group-hover/link:-translate-y-0.5">↗</span>
+                  </a>
+                </div>
               </div>
             </div>
-          </Link>
+          </div>
           <button
             onClick={onClose}
             className="lg:hidden p-1.5 text-slate-400 hover:text-white rounded-lg hover:bg-slate-800 transition-colors mt-0.5"

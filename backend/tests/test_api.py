@@ -166,3 +166,30 @@ def test_export_endpoint():
 
     res_xlsx = client.get("/api/data-transfer/export?format=xlsx", headers=headers)
     assert res_xlsx.status_code == 200
+
+def test_quick_notes():
+    login_res = client.post("/api/auth/login", json={
+        "username": "admin",
+        "password": "Password@123"
+    })
+    token = login_res.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+
+    # Create note
+    create_res = client.post("/api/notes", json={"content": "Test Dashboard Quick Note"}, headers=headers)
+    assert create_res.status_code == 201
+    note_id = create_res.json()["id"]
+
+    # List notes
+    list_res = client.get("/api/notes", headers=headers)
+    assert list_res.status_code == 200
+    assert any(n["id"] == note_id for n in list_res.json())
+
+    # Edit note
+    edit_res = client.put(f"/api/notes/{note_id}", json={"content": "Updated Dashboard Quick Note"}, headers=headers)
+    assert edit_res.status_code == 200
+    assert edit_res.json()["content"] == "Updated Dashboard Quick Note"
+
+    # Delete note
+    del_res = client.delete(f"/api/notes/{note_id}", headers=headers)
+    assert del_res.status_code == 200

@@ -6,6 +6,7 @@ import { useTheme } from '@/lib/theme-context';
 import { LogOut, Sun, Moon } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import Link from 'next/link';
+import QuickNotes from './QuickNotes';
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -52,6 +53,9 @@ export default function Navbar({ onMenuClick }: NavbarProps) {
       </div>
 
       <div className="flex items-center gap-2 sm:gap-3">
+        {/* Quick Notes Popover Button */}
+        {user && <QuickNotes />}
+
         {/* Compact Theme Toggle Icon Button */}
         <button
           onClick={toggleTheme}
